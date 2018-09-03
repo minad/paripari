@@ -1,0 +1,50 @@
+name: parparsec
+version: 0.1.0.0
+synopsis: Parser combinator library with parallel parsing strategy
+description: The parser combinator library provides two Parser instances. There is a fast Acceptor and a slow error-reporting Reporter which are evaluated in parallel. If the Acceptor fails, errors are reported by the Reporter. Like attoparsec, the parser combinators backtrack by default.
+category: Text
+stability: experimental
+author: Daniel Mendler <mail@daniel-mendler.de>
+maintainer: Daniel Mendler <mail@daniel-mendler.de>
+copyright: 2018 Daniel Mendler
+license: MIT
+github: minad/parparsec
+
+tested-with:
+  GHC == 8.2.1,
+  GHC == 8.4.3,
+  GHC == 8.6.1
+
+flags:
+  trace:
+    description: Enabled parser tracing
+    default: False
+    manual: True
+
+default-extensions:
+- BangPatterns
+- MultiWayIf
+- NamedFieldPuns
+- OverloadedStrings
+- Rank2Types
+
+ghc-options:
+- -Wall
+- -Widentities
+- -Wmonomorphism-restriction
+- -Wincomplete-uni-patterns
+- -Wincomplete-record-updates
+- -Wtabs
+- -fprint-potential-instances
+
+dependencies:
+- base               >= 4.8  && < 5
+- text               >= 0.11 && < 1.3
+- bytestring         >= 0.10 && < 0.11
+- parser-combinators >= 1.0  && < 1.1
+
+library:
+  source-dirs: src
+  when:
+  - condition: flag(trace)
+    cpp-options: -DTRACE_PARSER
