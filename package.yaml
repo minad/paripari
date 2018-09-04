@@ -15,12 +15,6 @@ tested-with:
   GHC == 8.4.3,
   GHC == 8.6.1
 
-flags:
-  trace:
-    description: Enabled parser tracing
-    default: False
-    manual: True
-
 default-extensions:
 - BangPatterns
 - MultiWayIf
@@ -42,9 +36,3 @@ dependencies:
 - text               >= 0.11 && < 1.3
 - bytestring         >= 0.10 && < 0.11
 - parser-combinators >= 1.0  && < 1.1
-
-library:
-  source-dirs: src
-  when:
-  - condition: flag(trace)
-    cpp-options: -DTRACE_PARSER

@@ -231,17 +231,23 @@ addLabel l env = case _envLabel env of
 
 addError :: Env -> State -> Error -> State
 addError env st e
-  | _envHidden env = st
-  | _stOff st > _stErrOff st =
-      st { _stError   = [(e, _envLabel env)]
+  | _stOff st > _stErrOff st, Just e' <- mkError env e =
+      st { _stError   = [e']
          , _stErrOff  = _stOff st
          , _stErrLine = _stLine st
          , _stErrCol  = _stCol st
          }
-  | _stOff st >= _stErrOff st =
-      st { _stError = take maxErrors $ nub $ (e, _envLabel env) : _stError st }
+  | _stOff st >= _stErrOff st, Just e' <- mkError env e =
+      st { _stError = take maxErrors $ nub $ e' : _stError st }
   | otherwise = st
 {-# INLINE addError #-}
+
+mkError :: Env -> Error -> Maybe LabelledError
+mkError env e
+  | _envHidden env, (l:ls) <- _envLabel env = Just $ (EExpected l, ls)
+  | _envHidden env = Nothing
+  | otherwise = Just $ (e, _envLabel env)
+{-# INLINE mkError #-}
 
 mergeError :: State -> State -> State
 mergeError s s'
@@ -296,10 +302,8 @@ errorsS :: [LabelledError] -> ShowS
 errorsS [] = ("No errors" <>)
 errorsS xs = go xs
   where go [] = id
-        go ((e,l):es) = (showError e <>) . ('.':) . labelS l . ('\n':) . go es
+        go ((e,l):es) = (showError e <>) . labelS l . ('\n':) . go es
 
 labelS :: [String] -> ShowS
-labelS [] = id
-labelS (x:xs) = (" Expected " <>) . (x <>) . context xs . ('.':)
-  where context [] = id
-        context ys = (" in context of " <>) . (intercalate ", " ys <>)
+labelS [] = ('.':)
+labelS xs = (" in context of " <>) . (intercalate ", " xs <>) . ('.':)
