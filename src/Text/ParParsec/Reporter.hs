@@ -226,7 +226,7 @@ get f = Reporter $ \env st ok _ -> ok (f env st) st
 addLabel :: String -> Env -> Env
 addLabel l env = case _envLabel env of
   (l':_) | l == l' -> env
-  ls               -> env { _envLabel = l : ls }
+  ls               -> env { _envLabel = take maxLabels $ l : ls }
 {-# INLINE addLabel #-}
 
 addError :: Env -> State -> Error -> State
@@ -264,6 +264,9 @@ mergeError s s'
 
 maxErrors :: Int
 maxErrors = 20
+
+maxLabels :: Int
+maxLabels = 5
 
 runReporter :: Reporter a -> FilePath -> ByteString -> Either Report a
 runReporter p f t =
