@@ -2,7 +2,13 @@ module Text.ParParsec.Ascii (
   module Text.ParParsec.Ascii
 ) where
 
+import Data.ByteString (ByteString)
+import Data.Foldable (foldl')
 import Data.Word (Word8)
+import GHC.Show (showLitChar)
+import Numeric (showHex)
+import qualified Data.ByteString as B
+import qualified Data.Char as C
 
 asc_0, asc_9, asc_A, asc_E, asc_P, asc_a, asc_e, asc_p,
   asc_minus, asc_plus, asc_point, asc_newline :: Word8
@@ -18,3 +24,18 @@ asc_minus = 45
 asc_plus = 43
 asc_point = 46
 asc_newline = 10
+
+byteS :: Word8 -> ShowS
+byteS b
+  | b <= 127 = showLitChar $ C.chr (fromIntegral b)
+  | otherwise = ("\\x" <>) . showHex b
+
+bytesS :: ByteString -> ShowS
+bytesS b | B.length b == 1 = byteS $ B.head b
+         | otherwise = foldl' ((. byteS) . (.)) id $ B.unpack b
+
+showByte :: Word8 -> String
+showByte b = ('\'':) . byteS b . ('\'':) $ ""
+
+showBytes :: ByteString -> String
+showBytes b = ('"':) . bytesS b . ('"':) $ ""

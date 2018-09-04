@@ -76,6 +76,8 @@ import qualified Data.Char as C
 import qualified Data.Functor as F
 import qualified Data.Text.Encoding as T
 
+infix 0 <?>
+
 (<?>) :: Parser p => p a -> String -> p a
 (<?>) = flip label
 {-# INLINE (<?>) #-}
@@ -146,7 +148,7 @@ linefold = line <|> indented
 {-# INLINE linefold #-}
 
 notByte :: Parser p => Word8 -> p Word8
-notByte b = byteSatisfy (/= b)
+notByte b = byteSatisfy (/= b) <?> "not " <> showByte b
 {-# INLINE notByte #-}
 
 anyByte :: Parser p => p Word8
@@ -158,7 +160,7 @@ digitByte = byteSatisfy (\b -> b >= asc_0 && b <= asc_9) <?> "digit"
 {-# INLINE digitByte #-}
 
 integer :: (Num a, Parser p) => p sep -> Int -> p (a, Int)
-integer sep base = do
+integer sep base = label (integerLabel base) $ do
   unless (base >= 2 && base <= 36) $ fail "Only base 2 to 36 are supported"
   d <- digit base
   accum 1 $ fromIntegral d
@@ -167,6 +169,13 @@ integer sep base = do
           d <- sep *> digit base
           accum (i + 1) $ n * fromIntegral base + fromIntegral d
 {-# INLINE integer #-}
+
+integerLabel :: Int -> String
+integerLabel 2 = "binary integer"
+integerLabel 8 = "octal integer"
+integerLabel 10 = "decimal integer"
+integerLabel 16 = "hexadecimal integer"
+integerLabel b = "integer of base " <> show b
 
 digitToInt :: Int -> Word8 -> Word
 digitToInt base b
@@ -203,11 +212,11 @@ fraction expSep expBase coeffBasePow digitSep = do
 {-# INLINE fraction #-}
 
 fractionDec :: (Num a, Parser p) => p digitSep -> p (a, Int, a)
-fractionDec = fraction (byteSatisfy (\b -> b == asc_E || b == asc_e)) 10 1
+fractionDec sep = fraction (byteSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
 
 fractionHex :: (Num a, Parser p) => p digitSep -> p (a, Int, a)
-fractionHex = fraction (byteSatisfy (\b -> b == asc_P || b == asc_p)) 2 4
+fractionHex sep = fraction (byteSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
 
 char' :: Parser p => Char -> p Char
@@ -226,7 +235,7 @@ anyChar = satisfy (const True)
 {-# INLINE anyChar #-}
 
 alphaNumChar :: Parser p => p Char
-alphaNumChar = satisfy C.isAlphaNum <?> "alphanumeric"
+alphaNumChar = satisfy C.isAlphaNum <?> "alphanumeric character"
 {-# INLINE alphaNumChar #-}
 
 letterChar :: Parser p => p Char

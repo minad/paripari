@@ -2,20 +2,17 @@ module Text.ParParsec.Reporter (
   Reporter
   , Error(..)
   , runReporter
+  , showErrors
 ) where
 
 import Control.Monad (void)
-import Data.Foldable (foldl')
+import Data.List (intercalate, nub)
 import Foreign.ForeignPtr (ForeignPtr)
-import GHC.Show (showLitChar)
-import Numeric (showHex)
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
 import Text.ParParsec.Decode
 import qualified Control.Monad.Fail as Fail
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Internal as B
-import qualified Data.Char as C
 
 data Error = Error
   { _errLabel :: ![String]
@@ -81,7 +78,7 @@ instance Alternative Reporter where
   {-# INLINE empty #-}
 
   p1 <|> p2 = Reporter $ \env st ok err ->
-    let err' s' = unReporter p2 env (copyError st s') ok err
+    let err' s' = unReporter p2 env (mergeError st s') ok err
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
@@ -114,7 +111,7 @@ instance Parser Reporter where
   {-# INLINE setRefPos #-}
 
   label l p = Reporter $ \env st ok err ->
-    unReporter p env { _envLabel = l : _envLabel env } st ok err
+    unReporter p (addLabel env l) st ok err
   {-# INLINE label #-}
 
   notFollowedBy p = Reporter $ \env st ok err ->
@@ -144,7 +141,7 @@ instance Parser Reporter where
            , _stCol = if b == asc_newline then 1 else _stCol + 1
            }
        | otherwise ->
-           failWith env st err $ ("Expected '" <>) . showByte b . ('\'':) $ ""
+           failWith env st err $ "Expected " <> showByte b
   {-# INLINE byte #-}
 
   byteSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
@@ -157,7 +154,7 @@ instance Parser Reporter where
               , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
           | otherwise ->
-              failWith env st err $ ("Unexpected '" <>) . showByte b . ('\'':) $ ""
+              failWith env st err $ "Unexpected " <> showByte b
   {-# INLINE byteSatisfy #-}
 
   bytes b@(B.PS p i n) = Reporter $ \env st@State{_stOff,_stCol} ok err ->
@@ -165,7 +162,7 @@ instance Parser Reporter where
        bytesEqual (_envSrc env) _stOff p i n then
       ok b st { _stOff = _stOff + n, _stCol = _stCol + n }
     else
-      failWith env st err $ ("Expected '" <>) . showBytes b . ('\'':) $ ""
+      failWith env st err $ "Expected " <> showBytes b
   {-# INLINE bytes #-}
 
   asBytes p = do
@@ -205,34 +202,36 @@ instance Parser Reporter where
   {-# INLINE char #-}
 
 failWith :: Env -> State -> (State -> b) -> String -> b
-failWith env st err msg = err $ updateError env st msg
+failWith env st err msg = err $ addError env st msg
 {-# INLINE failWith #-}
 
-updateError :: Env -> State -> String -> State
-updateError env st msg
-  | _stOff st > _stErrOff st =
-      st { _stError = take maxErrors $ Error (_envLabel env) (_envFile env) msg (_stLine st) (_stCol st) : (_stError st)
-         , _stErrOff = _stOff st
-         }
-  | otherwise = st
-{-# INLINE updateError #-}
+addLabel :: Env -> String -> Env
+addLabel env l = case _envLabel env of
+  (l':_) | l == l' -> env
+  ls               -> env { _envLabel = l : ls }
+{-# INLINE addLabel #-}
 
-showByte :: Word8 -> ShowS
-showByte b | b <= 127 = showLitChar $ C.chr (fromIntegral b)
-           | otherwise = ("\\x" <>) . showHex b
+addError :: Env -> State -> String -> State
+addError env st msg =
+  let err = Error (_envLabel env) (_envFile env) msg (_stLine st) (_stCol st)
+  in if | _stOff st > _stErrOff st ->
+            st { _stError = [err], _stErrOff = _stOff st }
+        | _stOff st >= _stErrOff st ->
+            st { _stError = take maxErrors $ nub $ err : _stError st }
+        | otherwise -> st
+{-# INLINE addError #-}
 
-showBytes :: ByteString -> ShowS
-showBytes = foldl' ((. showByte) . (.)) id . B.unpack
-
-maxErrors :: Int
-maxErrors = 10
-
-copyError :: State -> State -> State
-copyError s s'
+mergeError :: State -> State -> State
+mergeError s s'
   | _stErrOff s' > _stErrOff s =
       s { _stError = _stError s', _stErrOff = _stErrOff s' }
+  | _stErrOff s' == _stErrOff s =
+      s { _stError = take maxErrors $ nub $ _stError s' <> _stError s }
   | otherwise = s
-{-# INLINE copyError #-}
+{-# INLINE mergeError #-}
+
+maxErrors :: Int
+maxErrors = 20
 
 get :: (Env -> State -> a) -> Reporter a
 get f = Reporter $ \env st ok _ -> ok (f env st) st
@@ -257,3 +256,18 @@ initialState (B.PS _ _stOff _) = State
   , _stErrOff = 0
   , _stError = []
   }
+
+showErrors :: [Error] -> String
+showErrors e = errorsS e ""
+
+errorsS :: [Error] -> ShowS
+errorsS [] = ("No errors" <>)
+errorsS xs = go xs
+  where go [] = id
+        go (e:es) = (_errMsg e <>) . ('.':) . labelS (_errLabel e) . ('\n':) . go es
+
+labelS :: [String] -> ShowS
+labelS [] = id
+labelS (x:xs) = (" Expected " <>) . (x <>) . context xs . ('.':)
+  where context [] = id
+        context ys = (" in context of " <>) . (intercalate ", " ys <>)
