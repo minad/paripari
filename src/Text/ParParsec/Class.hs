@@ -3,8 +3,10 @@ module Text.ParParsec.Class (
   , Alternative(..)
   , MonadPlus
   , Pos(..)
+  , Error(..)
   , ByteString
   , Word8
+  , showError
 ) where
 
 import Control.Applicative (Alternative(empty, (<|>)))
@@ -18,6 +20,19 @@ data Pos = Pos
   , _posColumn :: !Int
   } deriving (Eq, Show)
 
+data Error
+  = EEmpty
+  | EInvalidUtf8
+  | EExpectedEnd
+  | EExpected         String
+  | EUnexpected       String
+  | EFail             String
+  | ECombinator       String
+  | EIndentNotAligned !Int !Int
+  | EIndentOverLine   !Int !Int
+  | ENotEnoughIndent  !Int !Int
+  deriving (Eq, Show)
+
 class (MonadFail p, MonadPlus p) => Parser p where
   getFile :: p FilePath
   getPos :: p Pos
@@ -25,11 +40,25 @@ class (MonadFail p, MonadPlus p) => Parser p where
   setRefPos :: Pos -> p ()
   notFollowedBy :: Show a => p a -> p ()
   lookAhead :: p a -> p a
+  failWith :: Error -> p a
   eof :: p ()
   label :: String -> p a -> p a
+  hidden :: p a -> p a
   byte :: Word8 -> p Word8
   char :: Char -> p Char
   satisfy :: (Char -> Bool) -> p Char
   byteSatisfy :: (Word8 -> Bool) -> p Word8
   bytes :: ByteString -> p ByteString
   asBytes :: p () -> p ByteString
+
+showError :: Error -> String
+showError EEmpty                   = "No error"
+showError EInvalidUtf8             = "Invalid UTF-8 character found"
+showError EExpectedEnd             = "Expected end of file"
+showError (EExpected token)        = "Expected " <> token
+showError (EUnexpected token)      = "Unexpected " <> token
+showError (EFail msg)              = msg
+showError (ECombinator name)       = "Combinator " <> name <> " failed"
+showError (EIndentNotAligned rc c) = "Invalid alignment, expected column " <> show rc <> " expected, got " <> show c
+showError (EIndentOverLine   rl l) = "Indentation over line, expected line " <> show rl <> ", got " <> show l
+showError (ENotEnoughIndent  rc c) = "Not enough indentation, expected column " <> show rc <> ", got " <> show c

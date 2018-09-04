@@ -27,8 +27,8 @@ data State = State
 
 newtype Acceptor a = Acceptor
   { unAcceptor :: forall b. Env -> State
-               -> (a      -> State -> b)
-               -> (String -> b)
+               -> (a     -> State -> b)
+               -> (Error -> b)
                -> b
   }
 
@@ -60,7 +60,7 @@ instance Applicative Acceptor where
   {-# INLINE (<*) #-}
 
 instance Alternative Acceptor where
-  empty = Acceptor $ \_ _ _ err -> err ""
+  empty = Acceptor $ \_ _ _ err -> err EEmpty
   {-# INLINE empty #-}
 
   p1 <|> p2 = Acceptor $ \env st ok err ->
@@ -80,7 +80,7 @@ instance Monad Acceptor where
   {-# INLINE fail #-}
 
 instance Fail.MonadFail Acceptor where
-  fail msg = Acceptor $ \_ _ _ err -> err msg
+  fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
 instance Parser Acceptor where
@@ -97,7 +97,7 @@ instance Parser Acceptor where
   {-# INLINE setRefPos #-}
 
   notFollowedBy p = Acceptor $ \env st ok err ->
-    let ok' _ _ = err "notFollowedBy"
+    let ok' _ _ = err $ ECombinator "notFollowedBy"
         err' _ = ok () st
     in unAcceptor p env st ok' err'
   {-# INLINE notFollowedBy #-}
@@ -107,18 +107,24 @@ instance Parser Acceptor where
     in unAcceptor p env st ok' err
   {-# INLINE lookAhead #-}
 
+  failWith e = Acceptor $ \_ _ _ err -> err e
+  {-# INLINE failWith #-}
+
   eof = Acceptor $ \env st ok err ->
     if _stOff st >= _envEnd env then
       ok () st
     else
-      err "eof"
+      err EExpectedEnd
   {-# INLINE eof #-}
 
   label _ p = p
   {-# INLINE label #-}
 
+  hidden p = p
+  {-# INLINE hidden #-}
+
   byte b = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    if | _stOff >= _envEnd env -> err ""
+    if | _stOff >= _envEnd env -> err EEmpty
        | b == byteAt (_envSrc env) _stOff ->
            ok b st
            { _stOff =_stOff + 1
@@ -126,12 +132,12 @@ instance Parser Acceptor where
            , _stCol = if b == asc_newline then 1 else _stCol + 1
            }
        | otherwise ->
-           err "byte"
+           err $ ECombinator "byte"
   {-# INLINE byte #-}
 
   byteSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt (_envSrc env) _stOff
-    in if | _stOff >= _envEnd env -> err ""
+    in if | _stOff >= _envEnd env -> err EEmpty
           | f b ->
               ok b st
               { _stOff =_stOff + 1
@@ -139,7 +145,7 @@ instance Parser Acceptor where
               , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
           | otherwise ->
-              err "byteSatisfy"
+              err $ ECombinator "byteSatisfy"
   {-# INLINE byteSatisfy #-}
 
   bytes b@(B.PS p i n) = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
@@ -147,7 +153,7 @@ instance Parser Acceptor where
        bytesEqual (_envSrc env) _stOff p i n then
       ok b st { _stOff = _stOff + n, _stCol = _stCol + n }
     else
-      err "bytes"
+      err $ ECombinator "bytes"
   {-# INLINE bytes #-}
 
   asBytes p = do
@@ -168,9 +174,9 @@ instance Parser Acceptor where
               , _stCol = if c == '\n' then 1 else _stCol + 1
               }
             else
-              err "satisfy"
-          | c == '\0' && _stOff >= _envEnd env -> err ""
-          | otherwise -> err "satisfy"
+              err $ ECombinator "satisfy"
+          | c == '\0' && _stOff >= _envEnd env -> err EEmpty
+          | otherwise -> err $ ECombinator "satisfy"
   {-# INLINE satisfy #-}
 
   char c =
@@ -183,14 +189,14 @@ instance Parser Acceptor where
         , _stCol = if c == '\n' then 1 else _stCol + 1
         }
       else
-        err "char"
+        err $ ECombinator "char"
   {-# INLINE char #-}
 
 get :: (Env -> State -> a) -> Acceptor a
 get f = Acceptor $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
-runAcceptor :: Acceptor a -> FilePath -> ByteString -> Either String a
+runAcceptor :: Acceptor a -> FilePath -> ByteString -> Either Error a
 runAcceptor p f t =
   let b = t <> "\0\0\0"
   in unAcceptor p (initialEnv f b) (initialState b) (\x _ -> Right x) Left

@@ -14,7 +14,7 @@ import Text.ParParsec.Reporter
 import GHC.Conc (par)
 
 -- Inline to force the specializer to kick in
-runParser :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either [Error] a
+runParser :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
 runParser p f b =
   let a = runAcceptor p f b
       r = runReporter p f b
@@ -23,7 +23,7 @@ runParser p f b =
        Right x -> Right x
 {-# INLINE runParser #-}
 
-runParser' :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either [Error] a
+runParser' :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
 runParser' p f b =
   let a = runAcceptor p f b
       r = runReporter p f b

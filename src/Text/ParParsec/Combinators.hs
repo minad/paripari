@@ -114,7 +114,7 @@ line :: Parser p => p ()
 line = do
   l <- getLine
   rl <- getRefLine
-  when (l /= rl) $ fail "Over one line"
+  when (l /= rl) $ failWith $ EIndentOverLine rl l
 {-# INLINE line #-}
 
 saveRef :: Parser p => p a -> p a
@@ -130,7 +130,7 @@ align :: Parser p => p ()
 align = do
   c <- getColumn
   rc <- getRefColumn
-  when (c /= rc) $ fail "Indentation not aligned"
+  when (c /= rc) $ failWith $ EIndentNotAligned rc c
 {-# INLINE align #-}
 
 indented :: Parser p => p ()
@@ -138,7 +138,7 @@ indented = do
   c <- getColumn
   rc <- getRefColumn
   if c <= rc then
-    fail "Not enough indentation"
+    failWith $ ENotEnoughIndent rc c
   else
     getLine >>= setRefLine
 {-# INLINE indented #-}
@@ -161,7 +161,7 @@ digitByte = byteSatisfy (\b -> b >= asc_0 && b <= asc_9) <?> "digit"
 
 integer :: (Num a, Parser p) => p sep -> Int -> p (a, Int)
 integer sep base = label (integerLabel base) $ do
-  unless (base >= 2 && base <= 36) $ fail "Only base 2 to 36 are supported"
+  unless (base >= 2 && base <= 36) $ error "Text.ParParsec.Combinators.integer: Bases 2 to 36 are supported"
   d <- digit base
   accum 1 $ fromIntegral d
   where accum !i !n = next i n <|> pure (n, i)
