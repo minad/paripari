@@ -51,6 +51,7 @@ module Text.ParParsec.Combinators (
   , anyByte
   , digitByte
   , integer
+  , digit
   , signed
   , fractionHex
   , fractionDec
@@ -65,7 +66,7 @@ module Text.ParParsec.Combinators (
 ) where
 
 import Control.Applicative ((<|>))
-import Control.Monad (when, unless)
+import Control.Monad (when)
 import Control.Monad.Combinators (option)
 import Data.List.NonEmpty (NonEmpty(..))
 import Text.ParParsec.Ascii
@@ -176,13 +177,12 @@ anyByte :: Parser p => p Word8
 anyByte = byteSatisfy (const True)
 {-# INLINE anyByte #-}
 
-digitByte :: Parser p => p Word8
-digitByte = byteSatisfy (\b -> b >= asc_0 && b <= asc_9) <?> "digit"
+digitByte :: Parser p => Int -> p Word8
+digitByte base = byteSatisfy (isDigit base)
 {-# INLINE digitByte #-}
 
 integer :: (Num a, Parser p) => p sep -> Int -> p (a, Int)
 integer sep base = label (integerLabel base) $ do
-  unless (base >= 2 && base <= 36) $ error "Text.ParParsec.Combinators.integer: Bases 2 to 36 are supported"
   d <- digit base
   accum 1 $ fromIntegral d
   where accum !i !n = next i n <|> pure (n, i)
@@ -192,11 +192,11 @@ integer sep base = label (integerLabel base) $ do
 {-# INLINE integer #-}
 
 integerLabel :: Int -> String
-integerLabel 2 = "binary integer"
-integerLabel 8 = "octal integer"
+integerLabel 2  = "binary integer"
+integerLabel 8  = "octal integer"
 integerLabel 10 = "decimal integer"
 integerLabel 16 = "hexadecimal integer"
-integerLabel b = "integer of base " <> show b
+integerLabel b  = "integer of base " <> show b
 
 digitToInt :: Int -> Word8 -> Word
 digitToInt base b
@@ -211,10 +211,11 @@ digit base = digitToInt base <$> byteSatisfy (isDigit base)
 
 isDigit :: Int -> Word8 -> Bool
 isDigit base b
-  | base <= 10 = b >= asc_0 && b <= asc_0 + fromIntegral base - 1
-  | otherwise = (b >= asc_0 && b <= asc_9)
-                || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
-                || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
+  | base >= 2 && base <= 10 = b >= asc_0 && b <= asc_0 + fromIntegral base - 1
+  | base <= 36 = (b >= asc_0 && b <= asc_9)
+                 || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
+                 || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
+  |otherwise = error "Text.ParParsec.Combinators.isDigit: Bases 2 to 36 are supported"
 {-# INLINE isDigit #-}
 
 signed :: (Num a, Parser p) => p a -> p a
@@ -263,8 +264,8 @@ letterChar :: Parser p => p Char
 letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
-digitChar :: Parser p => p Char
-digitChar = unsafeChr . fromIntegral <$> digitByte
+digitChar :: Parser p => Int -> p Char
+digitChar base = unsafeChr . fromIntegral <$> digitByte base
 {-# INLINE digitChar #-}
 
 string :: Parser p => Text -> p Text
