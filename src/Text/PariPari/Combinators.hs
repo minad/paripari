@@ -240,7 +240,8 @@ fraction :: (Num a, MonadParser p) => p expSep -> Int -> Int -> p digitSep -> p 
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
   coeff <- fst <$> integer digitSep coeffBase
-  (frac, fracLen) <- option (0, 0) $ byte asc_point *> integer digitSep coeffBase
+  A.optional $ byte asc_point
+  (frac, fracLen) <- option (0, 0) $ integer digitSep coeffBase
   expVal <- option 0 $ expSep *> signed (fst <$> integer digitSep 10)
   pure (coeff * fromIntegral coeffBase ^ fracLen + frac,
         expBase,
