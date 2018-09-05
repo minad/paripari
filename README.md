@@ -40,7 +40,7 @@ json = space *> (object <|> array) <?> "json"
 
 Objects consist of pairs of a text string and a value.
 
-```
+``` haskell
 object :: Parser p => p Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
@@ -50,14 +50,14 @@ pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 
 Arrays are a list of values.
 
-```
+``` haskell
 array :: Parser p => p Value
 array = Array <$> (char '[' *> sepBy value (space *> char ',' *> space) <* space <* char ']') <?> "array"
 ```
 
 Furthermore, JSON supports text strings, boolean values, null and floating point numbers.
 
-```
+``` haskell
 value :: Parser p => p Value
 value =
   (String <$> text)
@@ -76,7 +76,7 @@ Floating point numbers are parsed by `fractionDec` which returns a coefficient,
 the base of the exponent and the exponent. The conversion to `Double` can be done
 for example by the `scientific` library.
 
-```
+``` haskell
 number :: Parser p => p Value
 number = label "number" $ do
   neg <- option id $ negate <$ char '-'
@@ -86,7 +86,7 @@ number = label "number" $ do
 
 For spaces we need another helper function.
 
-```
+``` haskell
 space :: Parser p => p ()
 space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
 ```
@@ -96,7 +96,7 @@ and prints the value if the parsing succeeded.
 In the case of an error a report is printed. For demonstration purposes
 we also run the tracing parsing with `runTracer`.
 
-```
+``` haskell
 main :: IO ()
 main = do
   args <- getArgs
@@ -115,7 +115,7 @@ main = do
 
 See the repository [parsers-bench](https://github.com/minad/parsers-bench/).
 
-<code>
+```
 parsers-bench-0.1.0: benchmarks
 Running 1 benchmarks...
 Benchmark bench-speed: RUNNING...
@@ -204,7 +204,7 @@ std dev              2.145 μs   (1.307 μs .. 3.899 μs)
 variance introduced by outliers: 65% (severely inflated)
 
 Benchmark bench-speed: FINISH
-</code>
+```
 
 ## Thanks
 
