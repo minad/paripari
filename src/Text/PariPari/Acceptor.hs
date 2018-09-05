@@ -200,6 +200,8 @@ instance MonadParser Acceptor where
           | otherwise -> err $ ECombinator "satisfy"
   {-# INLINE satisfy #-}
 
+  -- By inling this combinator, GHC should figure out the `utf8Width`
+  -- of the character resulting in an optimized decoder.
   char c =
     let w = utf8Width c
     in Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
@@ -213,10 +215,12 @@ instance MonadParser Acceptor where
         err $ ECombinator "char"
   {-# INLINE char #-}
 
+-- | Reader monad, get something from the environment
 get :: (Env -> State -> a) -> Acceptor a
 get f = Acceptor $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
+-- | Reader monad, modify environment locally
 local :: (State -> Env -> Env) -> Acceptor a -> Acceptor a
 local f p = Acceptor $ \env st ok err ->
   unAcceptor p (f st env) st ok err

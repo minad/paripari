@@ -113,7 +113,7 @@ instance Alternative Reporter where
   {-# INLINE empty #-}
 
   p1 <|> p2 = Reporter $ \env st ok err ->
-    let err' s = unReporter p2 env (mergeError env st s) ok err
+    let err' s = unReporter p2 env (mergeStateErrors env st s) ok err
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
@@ -256,11 +256,13 @@ raiseError :: Env -> State -> (State -> b) -> Error -> b
 raiseError env st err e = err $ addError env st e
 {-# INLINE raiseError #-}
 
+-- | Reader monad, modify environment locally
 local :: (State -> Env -> Env) -> Reporter a -> Reporter a
 local f p = Reporter $ \env st ok err ->
   unReporter p (f st env) st ok err
 {-# INLINE local #-}
 
+-- | Reader monad, get something from the environment
 get :: (Env -> State -> a) -> Reporter a
 get f = Reporter $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
@@ -271,6 +273,10 @@ addLabel l env = case _envContext env of
   ls               -> env { _envContext = take (_optMaxLabelsPerContext._envOptions $ env) $ l : ls }
 {-# INLINE addLabel #-}
 
+-- | Add parser error to the list of errors
+-- which are kept in the parser state.
+-- Errors of lower priority and at an earlier position.
+-- Furthermore the error is merged with existing errors if possible.
 addError :: Env -> State -> Error -> State
 addError env st e
   | _stOff st > _stErrOff st || _envCommit env > _stErrCommit st,
@@ -294,8 +300,9 @@ mkError env e
   | otherwise = Just $ ([e], _envContext env)
 {-# INLINE mkError #-}
 
-mergeError :: Env -> State -> State -> State
-mergeError env s s'
+-- | Merge errors of two states, used when backtracking
+mergeStateErrors :: Env -> State -> State -> State
+mergeStateErrors env s s'
   | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
@@ -306,7 +313,7 @@ mergeError env s s'
   | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
       s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
   | otherwise = s
-{-# INLINE mergeError #-}
+{-# INLINE mergeStateErrors #-}
 
 groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
@@ -314,6 +321,8 @@ groupOn f = NE.groupBy ((==) `on` f)
 shrinkErrors :: Env -> [ErrorContext] -> [ErrorContext]
 shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn snd . sortOn snd
 
+-- | Shrink error context by deleting duplicates
+-- and merging errors if possible.
 mergeErrorContexts :: Env -> NonEmpty ErrorContext -> ErrorContext
 mergeErrorContexts env es@((_, ctx):| _) = (take (_optMaxErrorsPerContext._envOptions $ env) $ nubSort $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
 
@@ -404,7 +413,7 @@ instance Alternative Tracer where
   p1 <|> p2 = Tracer $ Reporter $ \env st ok err ->
     let err' s =
           let width = _stOff s -_stOff st
-              next  = unReporter (unTracer p2) env (mergeError env st s) ok err
+              next  = unReporter (unTracer p2) env (mergeStateErrors env st s) ok err
           in if width > 1 then
                trace ("Back tracking " <> show width <> " bytes at line " <> show (_stLine s)
                        <> ", column " <> show (_stCol s) <> ", context " <> show (_envContext env) <> ": "

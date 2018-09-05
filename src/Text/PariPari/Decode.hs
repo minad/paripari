@@ -31,6 +31,7 @@ at :: ForeignPtr Word8 -> Int -> Int
 at p i = fromIntegral $ byteAt p i
 {-# INLINE at #-}
 
+-- | Decode UTF-8 character at the given offset relative to the pointer
 utf8Decode :: ForeignPtr Word8 -> Int -> (Char, Int)
 utf8Decode p i
   | a1 <- at p i,
@@ -60,6 +61,7 @@ utf8Decode p i
   | otherwise = ('\0', 0)
 {-# INLINE utf8Decode #-}
 
+-- | Decode UTF-8 character with known width at the given offset relative to the pointer
 utf8DecodeFixed :: Int -> ForeignPtr Word8 -> Int -> Char
 utf8DecodeFixed w p i = unsafeChr $
   case w of
@@ -79,6 +81,7 @@ utf8DecodeFixed w p i = unsafeChr $
     _ -> 0
 {-# INLINE utf8DecodeFixed #-}
 
+-- | Bytes width of an UTF-8 character
 utf8Width :: Char -> Int
 utf8Width c | c <= unsafeChr 0x7F = 1
             | c <= unsafeChr 0x7FF = 2
