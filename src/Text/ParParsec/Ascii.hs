@@ -5,10 +5,10 @@ module Text.ParParsec.Ascii (
 import Data.ByteString (ByteString)
 import Data.Foldable (foldl')
 import Data.Word (Word8)
+import GHC.Base (unsafeChr)
 import GHC.Show (showLitChar)
 import Numeric (showHex)
 import qualified Data.ByteString as B
-import qualified Data.Char as C
 
 asc_0, asc_9, asc_A, asc_E, asc_P, asc_a, asc_e, asc_p,
   asc_minus, asc_plus, asc_point, asc_newline :: Word8
@@ -25,9 +25,13 @@ asc_plus = 43
 asc_point = 46
 asc_newline = 10
 
+unsafeAsciiToChar :: Word8 -> Char
+unsafeAsciiToChar = unsafeChr . fromIntegral
+{-# INLINE unsafeAsciiToChar #-}
+
 byteS :: Word8 -> ShowS
 byteS b
-  | b <= 127 = showLitChar $ C.chr (fromIntegral b)
+  | b < 128 = showLitChar $ unsafeAsciiToChar b
   | otherwise = ("\\x" <>) . showHex b
 
 bytesS :: ByteString -> ShowS

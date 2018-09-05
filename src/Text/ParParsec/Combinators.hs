@@ -50,6 +50,7 @@ module Text.ParParsec.Combinators (
   , notByte
   , anyByte
   , digitByte
+  , asciiByte
   , integer
   , digit
   , signed
@@ -61,6 +62,7 @@ module Text.ParParsec.Combinators (
   , alphaNumChar
   , digitChar
   , letterChar
+  , asciiChar
   , string
   , asString
 ) where
@@ -72,7 +74,6 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
 import Data.Text (Text)
-import GHC.Base (unsafeChr)
 import Prelude hiding (getLine)
 import qualified Control.Applicative as A
 import qualified Control.Monad.Combinators as O
@@ -177,6 +178,10 @@ anyByte :: Parser p => p Word8
 anyByte = byteSatisfy (const True)
 {-# INLINE anyByte #-}
 
+asciiByte :: Parser p => p Word8
+asciiByte = byteSatisfy (< 128)
+{-# INLINE asciiByte #-}
+
 digitByte :: Parser p => Int -> p Word8
 digitByte base = byteSatisfy (isDigit base)
 {-# INLINE digitByte #-}
@@ -265,8 +270,12 @@ letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
 digitChar :: Parser p => Int -> p Char
-digitChar base = unsafeChr . fromIntegral <$> digitByte base
+digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
+
+asciiChar :: Parser p => Int -> p Char
+asciiChar base = unsafeAsciiToChar <$> digitByte base
+{-# INLINE asciiChar #-}
 
 string :: Parser p => Text -> p Text
 string t = t <$ bytes (T.encodeUtf8 t)
