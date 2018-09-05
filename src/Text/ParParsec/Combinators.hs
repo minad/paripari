@@ -34,6 +34,10 @@ module Text.ParParsec.Combinators (
 
   -- * ParParsec
   , (<?>)
+  , getLine
+  , getColumn
+  , withPos
+  , withSpan
   , getRefColumn
   , getRefLine
   , setRefColumn
@@ -109,6 +113,23 @@ getLine = _posLine <$> getPos
 getColumn :: Parser p => p Int
 getColumn = _posColumn <$> getPos
 {-# INLINE getColumn #-}
+
+withPos :: Parser p => p a -> p (a, Pos)
+withPos p = do
+  ret <- p
+  pos <- getPos
+  pure (ret, pos)
+{-# INLINE withPos #-}
+
+type Span = (Pos, Pos)
+
+withSpan :: Parser p => p a -> p (a, Span)
+withSpan p = do
+  begin <- getPos
+  ret <- p
+  end <- getPos
+  pure (ret, (begin, end))
+{-# INLINE withSpan #-}
 
 line :: Parser p => p ()
 line = do
