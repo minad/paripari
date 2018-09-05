@@ -17,12 +17,24 @@ than operating the parser on a suboptimal input format. However as a consequence
 is only a good fit for data which is available at once (no streaming).
 In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
+## Features
+
+* Fast-path parser without error reporting (Acceptor)
+  and fallback to slower error reporting parser (Reporter)
+  to optimize the common case
+* Backtracking by default for ease of use
+* `commit` combinator to improve error messages by commiting to branches
+* Tracing parser to analyze backtracking
+* Both byte and character parser combinators provided
+* Combinators for indentation-sensitive parsing
+* Most Parsec/Megaparsec combinators provided, relying on parser-combinators
+
 ## Note: Issue with specialiser
 
 As of now there is an issue with the GHC specialiser which I have yet to figure out.
 Performance of PariPari depends crucially on the specialisation of `Parser a` to
 `Acceptor a` and `Reporter a`. However in larger parsers it seems that the specialiser
-does not kick in. As a workaroundI am using the script `gen-parser-specialiser` as a
+does not kick in. As a workaround I am using the script `gen-parser-specialiser` as a
 preprocessor which enforces the specialisation of all parsers.
 
 ```
