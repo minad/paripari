@@ -381,8 +381,9 @@ instance Alternative Tracer where
           let width = _stOff s -_stOff st
               next  = unReporter (unTracer p2) env (mergeError env st s) ok err
           in if width > 1 then
-               trace ("BACKTRACKING " <> show width <> " "
-                       <> show (B.PS (_envSrc env) (_stOff st) width)) next
+               trace ("Back tracking " <> show width <> " bytes at line " <> show (_stLine s)
+                       <> ", column " <> show (_stCol s) <> ", context " <> show (_envContext env) <> ": "
+                       <> showBytes (B.PS (_envSrc env) (_stOff st) width)) next
              else
                next
     in unReporter (unTracer p1) env st ok err'
