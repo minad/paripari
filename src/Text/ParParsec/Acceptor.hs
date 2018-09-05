@@ -32,6 +32,14 @@ newtype Acceptor a = Acceptor
                -> b
   }
 
+instance Semigroup a => Semigroup (Acceptor a) where
+  p1 <> p2 = (<>) <$> p1 <*> p2
+  {-# INLINE (<>) #-}
+
+instance Monoid a => Monoid (Acceptor a) where
+  mempty = pure mempty
+  {-# INLINE mempty #-}
+
 instance Functor Acceptor where
   fmap f p = Acceptor $ \env st ok err ->
     unAcceptor p env st (ok . f) err

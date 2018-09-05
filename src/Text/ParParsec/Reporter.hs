@@ -70,6 +70,14 @@ newtype Reporter a = Reporter
                -> b
   }
 
+instance Semigroup a => Semigroup (Reporter a) where
+  p1 <> p2 = (<>) <$> p1 <*> p2
+  {-# INLINE (<>) #-}
+
+instance Monoid a => Monoid (Reporter a) where
+  mempty = pure mempty
+  {-# INLINE mempty #-}
+
 instance Functor Reporter where
   fmap f p = Reporter $ \env st ok err ->
     unReporter p env st (ok . f) err
@@ -379,7 +387,7 @@ showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
 
 newtype Tracer a = Tracer { unTracer :: Reporter a }
-  deriving (Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, Parser)
+  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, Parser)
 
 instance Alternative Tracer where
   empty = Tracer empty
