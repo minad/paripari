@@ -39,3 +39,8 @@ dependencies:
 
 library:
   source-dirs: src
+
+executables:
+  example:
+    main: example.hs
+    dependencies: parparsec

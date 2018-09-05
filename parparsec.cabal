@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 990a940237c3f1633a6e2146db086b13568941a5eda0fd5dd8f6267451f6cd8e
+-- hash: 13b5004a00c41d2c1d32214d4333d7cd8271dae8de82ad9e955425c40e1eaa3d
 
 name:           parparsec
 version:        0.1.0.0
@@ -43,6 +43,20 @@ library
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
+    , parser-combinators >=1.0 && <1.1
+    , text >=0.11 && <1.3
+  default-language: Haskell2010
+
+executable example
+  main-is: example.hs
+  other-modules:
+      Paths_parparsec
+  default-extensions: BangPatterns MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types
+  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  build-depends:
+      base >=4.8 && <5
+    , bytestring >=0.10 && <0.11
+    , parparsec
     , parser-combinators >=1.0 && <1.1
     , text >=0.11 && <1.3
   default-language: Haskell2010

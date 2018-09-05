@@ -4,7 +4,8 @@ module Text.ParParsec.Reporter (
   , runReporter
   , runReporterWithOptions
   , ErrorContext
-  , showErrorContexts
+  , showReport
+  , showErrors
   , ReportOptions(..)
   , defaultReportOptions
 ) where
@@ -348,9 +349,16 @@ initialState (B.PS _ _stOff _) = State
   , _stErrors    = []
   }
 
-showErrorContexts :: [ErrorContext] -> String
-showErrorContexts [] = "No errors"
-showErrorContexts es = intercalate "\n" $ map showErrorContext es
+showReport :: Report -> String
+showReport r =
+  "Parser errors at " <> _reportFile r
+  <> ", line " <> show (_reportLine r)
+  <> ", column " <> show (_reportCol r)
+  <> "\n\n" <> showErrors (_reportErrors r)
+
+showErrors :: [ErrorContext] -> String
+showErrors [] = "No errors"
+showErrors es = intercalate "\n" $ map showErrorContext es
 
 showErrorContext :: ErrorContext -> String
 showErrorContext (e, c) = intercalate ", " (map showError e) <> showContext c <> "."
