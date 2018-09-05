@@ -1,13 +1,14 @@
 # PariPari: Fast parser combinator library for Haskell
 
-PariPari offers two parsing strategies. There is a fast Acceptor and a slow error-reporting Reporter which are evaluated in parallel. If the Acceptor fails, errors are reported by the Reporter.
+PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter which are evaluated in parallel. If the Acceptor fails, the Reporter returns a report about the parsing errors.
 This allows for fast parsing in the good case without compromising on the quality of the error messages. I have seen
 this idea coming up multiple times before (Trifecta after Attoparsec etc...). However this library provides both parsers
 out of the box with equivalent behaviour, in particular with respect to backtracking.
 
-Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: Parser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be avoided by debugging with the tracing parser, which prints messages when backtracking occurs.
+Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: Parser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
 PariPari operates only on strict bytestrings, which are interpreted as UTF-8 if characters are parsed.
+Conversion to bytestrings is much cheaper than operating the parser on a suboptimal input format.
 In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
 ## Note: Issue with specialiser
@@ -21,6 +22,9 @@ preprocessor which enforces the specialisation of all parsers.
 ``` haskell
 {-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
 ```
+
+For smaller examples it works as desired though. The benchmarks below were obtained without
+the specialiser hack.
 
 ## Example
 
