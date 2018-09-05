@@ -195,7 +195,8 @@ integer sep base = label (integerLabel base) $ do
   accum 1 $ fromIntegral d
   where accum !i !n = next i n <|> pure (n, i)
         next !i !n = do
-          d <- sep *> digit base
+          sep
+          d <- digit base
           accum (i + 1) $ n * fromIntegral base + fromIntegral d
 {-# INLINE integer #-}
 
