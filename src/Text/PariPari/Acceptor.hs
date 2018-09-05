@@ -12,15 +12,15 @@ import qualified Control.Monad.Fail as Fail
 import qualified Data.ByteString.Internal as B
 
 data Env = Env
-  { _envSrc  :: !(ForeignPtr Word8)
-  , _envEnd  :: !Int
-  , _envFile :: !FilePath
+  { _envSrc     :: !(ForeignPtr Word8)
+  , _envEnd     :: !Int
+  , _envFile    :: !FilePath
+  , _envRefLine :: !Int
+  , _envRefCol  :: !Int
   }
 
 data State = State
   { _stOff     :: !Int
-  , _stRefLine :: !Int
-  , _stRefCol  :: !Int
   , _stLine    :: !Int
   , _stCol     :: !Int
   }
@@ -98,11 +98,11 @@ instance MonadParser Acceptor where
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \_ st -> Pos (_stRefLine st) (_stRefCol st)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
   {-# INLINE getRefPos #-}
 
-  setRefPos (Pos l c) = Acceptor $ \_ st ok _ -> ok () st { _stRefLine = l, _stRefCol = c }
-  {-# INLINE setRefPos #-}
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
+  {-# INLINE withRefPos #-}
 
   notFollowedBy p = Acceptor $ \env st ok err ->
     let ok' _ _ = err $ ECombinator "notFollowedBy"
@@ -215,6 +215,11 @@ get :: (Env -> State -> a) -> Acceptor a
 get f = Acceptor $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
+local :: (State -> Env -> Env) -> Acceptor a -> Acceptor a
+local f p = Acceptor $ \env st ok err ->
+  unAcceptor p (f st env) st ok err
+{-# INLINE local #-}
+
 runAcceptor :: Acceptor a -> FilePath -> ByteString -> Either Error a
 runAcceptor p f t =
   let b = t <> "\0\0\0"
@@ -222,13 +227,16 @@ runAcceptor p f t =
 
 initialEnv :: FilePath -> ByteString -> Env
 initialEnv _envFile (B.PS _envSrc off len) = Env
-  { _envSrc, _envEnd = off + len - 3, _envFile }
+  { _envSrc
+  , _envFile
+  , _envEnd = off + len - 3
+  , _envRefLine = 0
+  , _envRefCol = 0
+  }
 
 initialState :: ByteString -> State
 initialState (B.PS _ _stOff _) = State
   { _stOff
-  , _stRefLine = 0
-  , _stRefCol = 0
   , _stLine = 1
   , _stCol = 1
   }

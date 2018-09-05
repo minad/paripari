@@ -48,12 +48,12 @@ data Env = Env
   , _envHidden  :: !Bool
   , _envCommit  :: !Int
   , _envContext :: [String]
+  , _envRefLine :: !Int
+  , _envRefCol  :: !Int
   }
 
 data State = State
   { _stOff       :: !Int
-  , _stRefLine   :: !Int
-  , _stRefCol    :: !Int
   , _stLine      :: !Int
   , _stCol       :: !Int
   , _stErrOff    :: !Int
@@ -136,19 +136,19 @@ instance MonadParser Reporter where
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \_ st -> Pos (_stRefLine st) (_stRefCol st)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
   {-# INLINE getRefPos #-}
 
-  setRefPos (Pos l c) = Reporter $ \_ st ok _ -> ok () st { _stRefLine = l, _stRefCol = c }
-  {-# INLINE setRefPos #-}
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
+  {-# INLINE withRefPos #-}
 
-  label l p = local (addLabel l) p
+  label l p = local (const $ addLabel l) p
   {-# INLINE label #-}
 
-  hidden p = local (\env -> env { _envHidden = True }) p
+  hidden p = local (const $ \env -> env { _envHidden = True }) p
   {-# INLINE hidden #-}
 
-  commit p = local (\env -> env { _envCommit = _envCommit env + 1 }) p
+  commit p = local (const $ \env -> env { _envCommit = _envCommit env + 1 }) p
   {-# INLINE commit #-}
 
   notFollowedBy p = Reporter $ \env st ok err ->
@@ -253,9 +253,9 @@ raiseError :: Env -> State -> (State -> b) -> Error -> b
 raiseError env st err e = err $ addError env st e
 {-# INLINE raiseError #-}
 
-local :: (Env -> Env) -> Reporter a -> Reporter a
+local :: (State -> Env -> Env) -> Reporter a -> Reporter a
 local f p = Reporter $ \env st ok err ->
-  unReporter p (f env) st ok err
+  unReporter p (f st env) st ok err
 {-# INLINE local #-}
 
 get :: (Env -> State -> a) -> Reporter a
@@ -345,6 +345,8 @@ initialEnv _envOptions _envFile (B.PS _envSrc off len) = Env
   , _envContext = []
   , _envHidden  = False
   , _envCommit  = 0
+  , _envRefLine = 0
+  , _envRefCol  = 0
   }
 
 defaultReportOptions :: ReportOptions
@@ -357,8 +359,6 @@ defaultReportOptions = ReportOptions
 initialState :: ByteString -> State
 initialState (B.PS _ _stOff _) = State
   { _stOff
-  , _stRefLine   = 0
-  , _stRefCol    = 0
   , _stLine      = 1
   , _stCol       = 1
   , _stErrOff    = 0

@@ -41,7 +41,7 @@ class (MonadFail p, MonadPlus p) => MonadParser p where
   getFile :: p FilePath
   getPos :: p Pos
   getRefPos :: p Pos
-  setRefPos :: Pos -> p ()
+  withRefPos :: p a -> p a
   notFollowedBy :: Show a => p a -> p ()
   lookAhead :: p a -> p a
   failWith :: Error -> p a

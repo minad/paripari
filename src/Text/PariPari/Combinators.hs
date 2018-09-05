@@ -40,9 +40,7 @@ module Text.PariPari.Combinators (
   , withSpan
   , getRefColumn
   , getRefLine
-  , setRefColumn
-  , setRefLine
-  , saveRef
+  , withRefPos
   , align
   , indented
   , line
@@ -105,18 +103,6 @@ getRefColumn :: Parser Int
 getRefColumn = _posColumn <$> getRefPos
 {-# INLINE getRefColumn #-}
 
-setRefLine :: Int -> Parser ()
-setRefLine l = do
-  c <- getRefColumn
-  setRefPos $ Pos l c
-{-# INLINE setRefLine #-}
-
-setRefColumn :: Int -> Parser ()
-setRefColumn c = do
-  l <- getRefLine
-  setRefPos $ Pos l c
-{-# INLINE setRefColumn #-}
-
 getLine :: Parser Int
 getLine = _posLine <$> getPos
 {-# INLINE getLine #-}
@@ -149,15 +135,6 @@ line = do
   when (l /= rl) $ failWith $ EIndentOverLine rl l
 {-# INLINE line #-}
 
-saveRef :: MonadParser p => p a -> p a
-saveRef p = do
-  r <- getRefPos
-  getPos >>= setRefPos
-  x <- p
-  setRefPos r
-  pure x
-{-# INLINE saveRef #-}
-
 align :: Parser ()
 align = do
   c <- getColumn
@@ -169,10 +146,7 @@ indented :: Parser ()
 indented = do
   c <- getColumn
   rc <- getRefColumn
-  if c <= rc then
-    failWith $ ENotEnoughIndent rc c
-  else
-    getLine >>= setRefLine
+  when (c <= rc) $ failWith $ ENotEnoughIndent rc c
 {-# INLINE indented #-}
 
 linefold :: Parser ()
