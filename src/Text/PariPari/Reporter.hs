@@ -18,6 +18,7 @@ import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Debug.Trace (trace)
 import Foreign.ForeignPtr (ForeignPtr)
+import GHC.Generics (Generic)
 import Text.PariPari.Ascii
 import Text.PariPari.Class
 import Text.PariPari.Decode
@@ -31,14 +32,14 @@ data ReportOptions = ReportOptions
   { _optMaxContexts         :: !Int
   , _optMaxErrorsPerContext :: !Int
   , _optMaxLabelsPerContext :: !Int
-  }
+  } deriving (Eq, Show, Generic)
 
 data Report = Report
   { _reportFile   :: !FilePath
   , _reportLine   :: !Int
   , _reportCol    :: !Int
   , _reportErrors :: [ErrorContext]
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
 
 data Env = Env
   { _envSrc     :: !(ForeignPtr Word8)

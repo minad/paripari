@@ -16,12 +16,13 @@ import Control.Monad.Fail (MonadFail(..))
 import Data.ByteString (ByteString)
 import Data.List (intercalate)
 import Data.Word (Word8)
+import GHC.Generics (Generic)
 
 -- | Line and column position starting at (1,1)
 data Pos = Pos
   { _posLine   :: !Int
   , _posColumn :: !Int
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, Generic)
 
 -- | Parsing errors
 data Error
@@ -35,7 +36,7 @@ data Error
   | EIndentNotAligned !Int !Int
   | EIndentOverLine   !Int !Int
   | ENotEnoughIndent  !Int !Int
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | Parser shortcut
 type Parser a = (forall p. MonadParser p => p a)
