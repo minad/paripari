@@ -8,7 +8,7 @@ module Text.ParParsec.Reporter (
 
 import Control.Monad (void)
 import Data.Function (on)
-import Data.List (intercalate, nub)
+import Data.List (intercalate, nub, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Foreign.ForeignPtr (ForeignPtr)
 import Text.ParParsec.Ascii
@@ -279,7 +279,7 @@ groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
 
 shrinkErrors :: [ErrorContext] -> [ErrorContext]
-shrinkErrors = take maxErrorContexts . map mergeErrorContexts . groupOn snd
+shrinkErrors = take maxErrorContexts . map mergeErrorContexts . groupOn snd . sortOn snd
 
 mergeErrorContexts :: NonEmpty ErrorContext -> ErrorContext
 mergeErrorContexts es@((_, ctx):| _) = (take maxErrorsPerContext $ nub $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
