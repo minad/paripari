@@ -2,34 +2,38 @@ module Text.ParParsec.Reporter (
   Reporter
   , Report(..)
   , runReporter
-  , showErrors
+  , ErrorContext
+  , showErrorContexts
 ) where
 
 import Control.Monad (void)
+import Data.Function (on)
 import Data.List (intercalate, nub)
+import Data.List.NonEmpty (NonEmpty(..))
 import Foreign.ForeignPtr (ForeignPtr)
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
 import Text.ParParsec.Decode
 import qualified Control.Monad.Fail as Fail
 import qualified Data.ByteString.Internal as B
+import qualified Data.List.NonEmpty as NE
 
-type LabelledError = (Error, [String])
+type ErrorContext = ([Error], [String])
 
 data Report = Report
-  { _reportFile  :: !FilePath
-  , _reportLine  :: !Int
-  , _reportCol   :: !Int
-  , _reportError :: [LabelledError]
+  { _reportFile   :: !FilePath
+  , _reportLine   :: !Int
+  , _reportCol    :: !Int
+  , _reportErrors :: [ErrorContext]
   } deriving (Eq, Show)
 
 data Env = Env
-  { _envSrc    :: !(ForeignPtr Word8)
-  , _envEnd    :: !Int
-  , _envFile   :: !FilePath
-  , _envHidden :: !Bool
-  , _envCommit :: !Int
-  , _envLabel  :: [String]
+  { _envSrc     :: !(ForeignPtr Word8)
+  , _envEnd     :: !Int
+  , _envFile    :: !FilePath
+  , _envHidden  :: !Bool
+  , _envCommit  :: !Int
+  , _envContext :: [String]
   }
 
 data State = State
@@ -42,7 +46,7 @@ data State = State
   , _stErrLine   :: !Int
   , _stErrCol    :: !Int
   , _stErrCommit :: !Int
-  , _stError     :: [LabelledError]
+  , _stErrors    :: [ErrorContext]
   }
 
 newtype Reporter a = Reporter
@@ -155,7 +159,7 @@ instance Parser Reporter where
            , _stCol = if b == asc_newline then 1 else _stCol + 1
            }
        | otherwise ->
-           raiseError env st err $ EExpected $ showByte b
+           raiseError env st err $ EExpected [showByte b]
   {-# INLINE byte #-}
 
   byteSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
@@ -176,7 +180,7 @@ instance Parser Reporter where
        bytesEqual (_envSrc env) _stOff p i n then
       ok b st { _stOff = _stOff + n, _stCol = _stCol + n }
     else
-      raiseError env st err $ EExpected $ showBytes b
+      raiseError env st err $ EExpected [showBytes b]
   {-# INLINE bytes #-}
 
   asBytes p = do
@@ -212,7 +216,7 @@ instance Parser Reporter where
         , _stCol = if c == '\n' then 1 else _stCol + 1
         }
       else
-        raiseError env st err $ EExpected $ show c
+        raiseError env st err $ EExpected [show c]
   {-# INLINE char #-}
 
 raiseError :: Env -> State -> (State -> b) -> Error -> b
@@ -229,16 +233,16 @@ get f = Reporter $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
 addLabel :: String -> Env -> Env
-addLabel l env = case _envLabel env of
+addLabel l env = case _envContext env of
   (l':_) | l == l' -> env
-  ls               -> env { _envLabel = take maxLabels $ l : ls }
+  ls               -> env { _envContext = take maxLabelsPerContext $ l : ls }
 {-# INLINE addLabel #-}
 
 addError :: Env -> State -> Error -> State
 addError env st e
   | _stOff st > _stErrOff st || _envCommit env > _stErrCommit st,
     Just e' <- mkError env e =
-      st { _stError     = [e']
+      st { _stErrors    = [e']
          , _stErrOff    = _stOff st
          , _stErrLine   = _stLine st
          , _stErrCol    = _stCol st
@@ -246,36 +250,56 @@ addError env st e
          }
   | _stOff st == _stErrOff st && _envCommit env == _stErrCommit st,
     Just e' <- mkError env e =
-      st { _stError = take maxErrors $ nub $ e' : _stError st }
+      st { _stErrors = shrinkErrors $ e' : _stErrors st }
   | otherwise = st
 {-# INLINE addError #-}
 
-mkError :: Env -> Error -> Maybe LabelledError
+mkError :: Env -> Error -> Maybe ErrorContext
 mkError env e
-  | _envHidden env, (l:ls) <- _envLabel env = Just $ (EExpected l, ls)
+  | _envHidden env, (l:ls) <- _envContext env = Just $ ([EExpected [l]], ls)
   | _envHidden env = Nothing
-  | otherwise = Just $ (e, _envLabel env)
+  | otherwise = Just $ ([e], _envContext env)
 {-# INLINE mkError #-}
 
 mergeError :: State -> State -> State
 mergeError s s'
   | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
-      s { _stError     = _stError s'
+      s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
         , _stErrLine   = _stErrLine s'
         , _stErrCol    = _stErrCol s'
         , _stErrCommit = _stErrCommit s'
         }
   | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
-      s { _stError = take maxErrors $ nub $ _stError s' <> _stError s }
+      s { _stErrors = shrinkErrors $ _stErrors s' <> _stErrors s }
   | otherwise = s
 {-# INLINE mergeError #-}
 
-maxErrors :: Int
-maxErrors = 20
+groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
+groupOn f = NE.groupBy ((==) `on` f)
 
-maxLabels :: Int
-maxLabels = 5
+shrinkErrors :: [ErrorContext] -> [ErrorContext]
+shrinkErrors = take maxErrorContexts . map mergeErrorContexts . groupOn snd
+
+mergeErrorContexts :: NonEmpty ErrorContext -> ErrorContext
+mergeErrorContexts es@((_, ctx):| _) = (take maxErrorsPerContext $ nub $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
+
+mergeEExpected :: [Error] -> [Error]
+mergeEExpected es = [EExpected $ nub expects | not (null expects)] <> filter (null . asEExpected) es
+  where expects = concatMap asEExpected es
+
+asEExpected :: Error -> [String]
+asEExpected (EExpected s) = s
+asEExpected _ = []
+
+maxErrorContexts :: Int
+maxErrorContexts = 20
+
+maxErrorsPerContext :: Int
+maxErrorsPerContext = 20
+
+maxLabelsPerContext :: Int
+maxLabelsPerContext = 5
 
 runReporter :: Reporter a -> FilePath -> ByteString -> Either Report a
 runReporter p f t =
@@ -283,16 +307,16 @@ runReporter p f t =
   in unReporter p (initialEnv f b) (initialState b) (\x _ -> Right x) (Left . getReport f)
 
 getReport :: FilePath -> State -> Report
-getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stError s)
+getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stErrors s)
 
 initialEnv :: FilePath -> ByteString -> Env
 initialEnv _envFile (B.PS _envSrc off len) = Env
   { _envFile
   , _envSrc
-  , _envEnd    = off + len - 3
-  , _envLabel  = []
-  , _envHidden = False
-  , _envCommit = 0
+  , _envEnd     = off + len - 3
+  , _envContext = []
+  , _envHidden  = False
+  , _envCommit  = 0
   }
 
 initialState :: ByteString -> State
@@ -306,18 +330,16 @@ initialState (B.PS _ _stOff _) = State
   , _stErrLine   = 0
   , _stErrCol    = 0
   , _stErrCommit = 0
-  , _stError     = []
+  , _stErrors    = []
   }
 
-showErrors :: [LabelledError] -> String
-showErrors e = errorsS e ""
+showErrorContexts :: [ErrorContext] -> String
+showErrorContexts [] = "No errors"
+showErrorContexts es = intercalate "\n" $ map showErrorContext es
 
-errorsS :: [LabelledError] -> ShowS
-errorsS [] = ("No errors" <>)
-errorsS xs = go xs
-  where go [] = id
-        go ((e,l):es) = (showError e <>) . labelS l . ('\n':) . go es
+showErrorContext :: ErrorContext -> String
+showErrorContext (e, c) = intercalate ", " (map showError e) <> showContext c <> "."
 
-labelS :: [String] -> ShowS
-labelS [] = ('.':)
-labelS xs = (" in context of " <>) . (intercalate ", " xs <>) . ('.':)
+showContext :: [String] -> String
+showContext [] = ""
+showContext xs = " in context of " <> intercalate ", " xs

@@ -13,6 +13,7 @@ import Control.Applicative (Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.Fail (MonadFail(..))
 import Data.ByteString (ByteString)
+import Data.List (intercalate)
 import Data.Word (Word8)
 
 data Pos = Pos
@@ -24,7 +25,7 @@ data Error
   = EEmpty
   | EInvalidUtf8
   | EExpectedEnd
-  | EExpected         String
+  | EExpected         [String]
   | EUnexpected       String
   | EFail             String
   | ECombinator       String
@@ -56,7 +57,7 @@ showError :: Error -> String
 showError EEmpty                   = "No error"
 showError EInvalidUtf8             = "Invalid UTF-8 character found"
 showError EExpectedEnd             = "Expected end of file"
-showError (EExpected token)        = "Expected " <> token
+showError (EExpected tokens)       = "Expected " <> intercalate ", " tokens
 showError (EUnexpected token)      = "Unexpected " <> token
 showError (EFail msg)              = msg
 showError (ECombinator name)       = "Combinator " <> name <> " failed"
