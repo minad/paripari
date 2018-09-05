@@ -1,13 +1,8 @@
--- Taken from parsers-bench by @mrkkrp
+-- Adapted from parsers-bench by @mrkkrp
 
 import System.Environment (getArgs)
 import Text.ParParsec
 import qualified Data.ByteString as B
-
-data Result a
-  = Error String
-  | Success a
-  deriving (Eq, Show)
 
 data Value
   = Object ![(Text, Value)]
