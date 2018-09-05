@@ -62,6 +62,10 @@ module Text.ParParsec.Combinators (
   , alphaNumChar
   , digitChar
   , letterChar
+  , symbolChar
+  , categoryChar
+  , punctuationChar
+  , spaceChar
   , asciiChar
   , string
   , asString
@@ -269,6 +273,18 @@ letterChar :: Parser p => p Char
 letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
+spaceChar :: Parser p => p Char
+spaceChar = satisfy C.isSpace <?> "space"
+{-# INLINE spaceChar #-}
+
+symbolChar :: Parser p => p Char
+symbolChar = satisfy C.isSymbol <?> "symbol"
+{-# INLINE symbolChar #-}
+
+punctuationChar :: Parser p => p Char
+punctuationChar = satisfy C.isPunctuation <?> "punctuation"
+{-# INLINE punctuationChar #-}
+
 digitChar :: Parser p => Int -> p Char
 digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
@@ -277,6 +293,10 @@ asciiChar :: Parser p => Int -> p Char
 asciiChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE asciiChar #-}
 
+categoryChar :: Parser p => C.GeneralCategory -> p Char
+categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
+{-# INLINE categoryChar #-}
+
 string :: Parser p => Text -> p Text
 string t = t <$ bytes (T.encodeUtf8 t)
 {-# INLINE string #-}
@@ -284,3 +304,10 @@ string t = t <$ bytes (T.encodeUtf8 t)
 asString :: Parser p => p () -> p Text
 asString p = T.decodeUtf8 <$> asBytes p
 {-# INLINE asString #-}
+
+untitle :: String -> String
+untitle []     = []
+untitle (x:xs) = C.toLower x : go xs
+  where go [] = ""
+        go (y:ys) | C.isUpper y = ' ' : C.toLower y : untitle ys
+                  | otherwise   = y : ys
