@@ -28,19 +28,21 @@ data Env = Env
   , _envEnd    :: !Int
   , _envFile   :: !FilePath
   , _envHidden :: !Bool
+  , _envCommit :: !Int
   , _envLabel  :: [String]
   }
 
 data State = State
-  { _stOff     :: !Int
-  , _stRefLine :: !Int
-  , _stRefCol  :: !Int
-  , _stLine    :: !Int
-  , _stCol     :: !Int
-  , _stErrOff  :: !Int
-  , _stErrLine :: !Int
-  , _stErrCol  :: !Int
-  , _stError   :: [LabelledError]
+  { _stOff       :: !Int
+  , _stRefLine   :: !Int
+  , _stRefCol    :: !Int
+  , _stLine      :: !Int
+  , _stCol       :: !Int
+  , _stErrOff    :: !Int
+  , _stErrLine   :: !Int
+  , _stErrCol    :: !Int
+  , _stErrCommit :: !Int
+  , _stError     :: [LabelledError]
   }
 
 newtype Reporter a = Reporter
@@ -119,6 +121,9 @@ instance Parser Reporter where
 
   hidden p = local (\env -> env { _envHidden = True }) p
   {-# INLINE hidden #-}
+
+  commit p = local (\env -> env { _envCommit = _envCommit env + 1 }) p
+  {-# INLINE commit #-}
 
   notFollowedBy p = Reporter $ \env st ok err ->
     let ok' x _ = raiseError env st err $ EUnexpected $ show x
@@ -231,13 +236,16 @@ addLabel l env = case _envLabel env of
 
 addError :: Env -> State -> Error -> State
 addError env st e
-  | _stOff st > _stErrOff st, Just e' <- mkError env e =
-      st { _stError   = [e']
-         , _stErrOff  = _stOff st
-         , _stErrLine = _stLine st
-         , _stErrCol  = _stCol st
+  | _stOff st > _stErrOff st || _envCommit env > _stErrCommit st,
+    Just e' <- mkError env e =
+      st { _stError     = [e']
+         , _stErrOff    = _stOff st
+         , _stErrLine   = _stLine st
+         , _stErrCol    = _stCol st
+         , _stErrCommit = _envCommit env
          }
-  | _stOff st >= _stErrOff st, Just e' <- mkError env e =
+  | _stOff st == _stErrOff st && _envCommit env == _stErrCommit st,
+    Just e' <- mkError env e =
       st { _stError = take maxErrors $ nub $ e' : _stError st }
   | otherwise = st
 {-# INLINE addError #-}
@@ -251,13 +259,14 @@ mkError env e
 
 mergeError :: State -> State -> State
 mergeError s s'
-  | _stErrOff s' > _stErrOff s =
-      s { _stError   = _stError s'
-        , _stErrOff  = _stErrOff s'
-        , _stErrLine = _stLine s'
-        , _stErrCol  = _stCol s'
+  | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
+      s { _stError     = _stError s'
+        , _stErrOff    = _stErrOff s'
+        , _stErrLine   = _stErrLine s'
+        , _stErrCol    = _stErrCol s'
+        , _stErrCommit = _stErrCommit s'
         }
-  | _stErrOff s' == _stErrOff s =
+  | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
       s { _stError = take maxErrors $ nub $ _stError s' <> _stError s }
   | otherwise = s
 {-# INLINE mergeError #-}
@@ -280,22 +289,24 @@ initialEnv :: FilePath -> ByteString -> Env
 initialEnv _envFile (B.PS _envSrc off len) = Env
   { _envFile
   , _envSrc
-  , _envEnd = off + len - 3
-  , _envLabel = []
+  , _envEnd    = off + len - 3
+  , _envLabel  = []
   , _envHidden = False
+  , _envCommit = 0
   }
 
 initialState :: ByteString -> State
 initialState (B.PS _ _stOff _) = State
   { _stOff
-  , _stRefLine = 0
-  , _stRefCol  = 0
-  , _stLine    = 1
-  , _stCol     = 1
-  , _stErrOff  = 0
-  , _stErrLine = 0
-  , _stErrCol  = 0
-  , _stError   = []
+  , _stRefLine   = 0
+  , _stRefCol    = 0
+  , _stLine      = 1
+  , _stCol       = 1
+  , _stErrOff    = 0
+  , _stErrLine   = 0
+  , _stErrCol    = 0
+  , _stErrCommit = 0
+  , _stError     = []
   }
 
 showErrors :: [LabelledError] -> String

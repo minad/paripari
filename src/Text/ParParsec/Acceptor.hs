@@ -123,6 +123,9 @@ instance Parser Acceptor where
   hidden p = p
   {-# INLINE hidden #-}
 
+  commit p = p
+  {-# INLINE commit #-}
+
   byte b = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff >= _envEnd env -> err EEmpty
        | b == byteAt (_envSrc env) _stOff ->

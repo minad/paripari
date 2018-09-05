@@ -44,6 +44,7 @@ class (MonadFail p, MonadPlus p) => Parser p where
   eof :: p ()
   label :: String -> p a -> p a
   hidden :: p a -> p a
+  commit :: p a -> p a
   byte :: Word8 -> p Word8
   char :: Char -> p Char
   satisfy :: (Char -> Bool) -> p Char
