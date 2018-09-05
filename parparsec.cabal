@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 13b5004a00c41d2c1d32214d4333d7cd8271dae8de82ad9e955425c40e1eaa3d
+-- hash: 83bd3a7e802a560ccadd1115aa60a4ae00aef8b540ecc9fa8418b63fe929fc30
 
 name:           parparsec
 version:        0.1.0.0
@@ -38,7 +38,7 @@ library
       Paths_parparsec
   hs-source-dirs:
       src
-  default-extensions: BangPatterns MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types
+  default-extensions: BangPatterns GeneralizedNewtypeDeriving MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types
   ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
@@ -51,7 +51,7 @@ executable example
   main-is: example.hs
   other-modules:
       Paths_parparsec
-  default-extensions: BangPatterns MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types
+  default-extensions: BangPatterns GeneralizedNewtypeDeriving MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types
   ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5

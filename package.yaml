@@ -17,6 +17,7 @@ tested-with:
 
 default-extensions:
 - BangPatterns
+- GeneralizedNewtypeDeriving
 - MultiWayIf
 - NamedFieldPuns
 - OverloadedStrings

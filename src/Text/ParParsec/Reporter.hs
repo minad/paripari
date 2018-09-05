@@ -8,12 +8,15 @@ module Text.ParParsec.Reporter (
   , showErrors
   , ReportOptions(..)
   , defaultReportOptions
+  , Tracer
+  , runTracer
 ) where
 
 import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
+import Debug.Trace (trace)
 import Foreign.ForeignPtr (ForeignPtr)
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
@@ -99,7 +102,7 @@ instance Alternative Reporter where
   {-# INLINE empty #-}
 
   p1 <|> p2 = Reporter $ \env st ok err ->
-    let err' s' = unReporter p2 env (mergeError env st s') ok err
+    let err' s = unReporter p2 env (mergeError env st s) ok err
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
@@ -366,3 +369,23 @@ showErrorContext (e, c) = intercalate ", " (map showError e) <> showContext c <>
 showContext :: [String] -> String
 showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
+
+newtype Tracer a = Tracer { unTracer :: Reporter a }
+  deriving (Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, Parser)
+
+instance Alternative Tracer where
+  empty = Tracer empty
+
+  p1 <|> p2 = Tracer $ Reporter $ \env st ok err ->
+    let err' s =
+          let width = _stOff s -_stOff st
+              next  = unReporter (unTracer p2) env (mergeError env st s) ok err
+          in if width > 1 then
+               trace ("BACKTRACKING " <> show width <> " "
+                       <> show (B.PS (_envSrc env) (_stOff st) width)) next
+             else
+               next
+    in unReporter (unTracer p1) env st ok err'
+
+runTracer :: Tracer a -> FilePath -> ByteString -> Either Report a
+runTracer = runReporter . unTracer
