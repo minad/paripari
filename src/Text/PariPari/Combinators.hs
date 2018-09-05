@@ -93,39 +93,39 @@ import qualified Data.Text as T
 
 infix 0 <?>
 
-(<?>) :: Parser p => p a -> String -> p a
+(<?>) :: MonadParser p => p a -> String -> p a
 (<?>) = flip label
 {-# INLINE (<?>) #-}
 
-getRefLine :: Parser p => p Int
+getRefLine :: Parser Int
 getRefLine = _posLine <$> getRefPos
 {-# INLINE getRefLine #-}
 
-getRefColumn :: Parser p => p Int
+getRefColumn :: Parser Int
 getRefColumn = _posColumn <$> getRefPos
 {-# INLINE getRefColumn #-}
 
-setRefLine :: Parser p => Int -> p ()
+setRefLine :: Int -> Parser ()
 setRefLine l = do
   c <- getRefColumn
   setRefPos $ Pos l c
 {-# INLINE setRefLine #-}
 
-setRefColumn :: Parser p => Int -> p ()
+setRefColumn :: Int -> Parser ()
 setRefColumn c = do
   l <- getRefLine
   setRefPos $ Pos l c
 {-# INLINE setRefColumn #-}
 
-getLine :: Parser p => p Int
+getLine :: Parser Int
 getLine = _posLine <$> getPos
 {-# INLINE getLine #-}
 
-getColumn :: Parser p => p Int
+getColumn :: Parser Int
 getColumn = _posColumn <$> getPos
 {-# INLINE getColumn #-}
 
-withPos :: Parser p => p a -> p (a, Pos)
+withPos :: MonadParser p => p a -> p (a, Pos)
 withPos p = do
   ret <- p
   pos <- getPos
@@ -134,7 +134,7 @@ withPos p = do
 
 type Span = (Pos, Pos)
 
-withSpan :: Parser p => p a -> p (a, Span)
+withSpan :: MonadParser p => p a -> p (a, Span)
 withSpan p = do
   begin <- getPos
   ret <- p
@@ -142,14 +142,14 @@ withSpan p = do
   pure (ret, (begin, end))
 {-# INLINE withSpan #-}
 
-line :: Parser p => p ()
+line :: Parser ()
 line = do
   l <- getLine
   rl <- getRefLine
   when (l /= rl) $ failWith $ EIndentOverLine rl l
 {-# INLINE line #-}
 
-saveRef :: Parser p => p a -> p a
+saveRef :: MonadParser p => p a -> p a
 saveRef p = do
   r <- getRefPos
   getPos >>= setRefPos
@@ -158,14 +158,14 @@ saveRef p = do
   pure x
 {-# INLINE saveRef #-}
 
-align :: Parser p => p ()
+align :: Parser ()
 align = do
   c <- getColumn
   rc <- getRefColumn
   when (c /= rc) $ failWith $ EIndentNotAligned rc c
 {-# INLINE align #-}
 
-indented :: Parser p => p ()
+indented :: Parser ()
 indented = do
   c <- getColumn
   rc <- getRefColumn
@@ -175,27 +175,27 @@ indented = do
     getLine >>= setRefLine
 {-# INLINE indented #-}
 
-linefold :: Parser p => p ()
+linefold :: Parser ()
 linefold = line <|> indented
 {-# INLINE linefold #-}
 
-notByte :: Parser p => Word8 -> p Word8
+notByte :: Word8 -> Parser Word8
 notByte b = byteSatisfy (/= b) <?> "not " <> showByte b
 {-# INLINE notByte #-}
 
-anyByte :: Parser p => p Word8
+anyByte :: Parser Word8
 anyByte = byteSatisfy (const True)
 {-# INLINE anyByte #-}
 
-asciiByte :: Parser p => p Word8
+asciiByte :: Parser Word8
 asciiByte = byteSatisfy (< 128)
 {-# INLINE asciiByte #-}
 
-digitByte :: Parser p => Int -> p Word8
+digitByte :: Int -> Parser Word8
 digitByte base = byteSatisfy (isDigit base)
 {-# INLINE digitByte #-}
 
-integer :: (Num a, Parser p) => p sep -> Int -> p (a, Int)
+integer :: (Num a, MonadParser p) => p sep -> Int -> p (a, Int)
 integer sep base = label (integerLabel base) $ do
   d <- digit base
   accum 1 $ fromIntegral d
@@ -219,7 +219,7 @@ digitToInt base b
   | n <- (fromIntegral b :: Word) - fromIntegral asc_a                        = n + 10
 {-# INLINE digitToInt #-}
 
-digit :: Parser p => Int -> p Word
+digit :: Int -> Parser Word
 digit base = digitToInt base <$> byteSatisfy (isDigit base)
 {-# INLINE digit #-}
 
@@ -232,11 +232,11 @@ isDigit base b
   |otherwise = error "Text.PariPari.Combinators.isDigit: Bases 2 to 36 are supported"
 {-# INLINE isDigit #-}
 
-signed :: (Num a, Parser p) => p a -> p a
+signed :: (Num a, MonadParser p) => p a -> p a
 signed p = ($) <$> ((id <$ byte asc_plus) <|> (negate <$ byte asc_minus) <|> pure id) <*> p
 {-# INLINE signed #-}
 
-fraction :: (Num a, Parser p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
+fraction :: (Num a, MonadParser p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
   coeff <- fst <$> integer digitSep coeffBase
@@ -247,74 +247,74 @@ fraction expSep expBase coeffBasePow digitSep = do
         expVal - fromIntegral (fracLen * coeffBasePow))
 {-# INLINE fraction #-}
 
-fractionDec :: (Num a, Parser p) => p digitSep -> p (a, Int, a)
+fractionDec :: (Num a, MonadParser p) => p digitSep -> p (a, Int, a)
 fractionDec sep = fraction (byteSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
 
-fractionHex :: (Num a, Parser p) => p digitSep -> p (a, Int, a)
+fractionHex :: (Num a, MonadParser p) => p digitSep -> p (a, Int, a)
 fractionHex sep = fraction (byteSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
 
-char' :: Parser p => Char -> p Char
+char' :: Char -> Parser Char
 char' x =
   let l = C.toLower x
       u = C.toUpper x
   in satisfy (\c -> c == l || c == u)
 {-# INLINE char' #-}
 
-notChar :: Parser p => Char -> p Char
+notChar :: Char -> Parser Char
 notChar c = satisfy (/= c)
 {-# INLINE notChar #-}
 
-anyChar :: Parser p => p Char
+anyChar :: Parser Char
 anyChar = satisfy (const True)
 {-# INLINE anyChar #-}
 
-alphaNumChar :: Parser p => p Char
+alphaNumChar :: Parser Char
 alphaNumChar = satisfy C.isAlphaNum <?> "alphanumeric character"
 {-# INLINE alphaNumChar #-}
 
-letterChar :: Parser p => p Char
+letterChar :: Parser Char
 letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
-lowerChar :: Parser p => p Char
+lowerChar :: Parser Char
 lowerChar = satisfy C.isLower <?> "lowercase letter"
 {-# INLINE lowerChar #-}
 
-upperChar :: Parser p => p Char
+upperChar :: Parser Char
 upperChar = satisfy C.isUpper <?> "uppercase letter"
 {-# INLINE upperChar #-}
 
-spaceChar :: Parser p => p Char
+spaceChar :: Parser Char
 spaceChar = satisfy C.isSpace <?> "space"
 {-# INLINE spaceChar #-}
 
-symbolChar :: Parser p => p Char
+symbolChar :: Parser Char
 symbolChar = satisfy C.isSymbol <?> "symbol"
 {-# INLINE symbolChar #-}
 
-punctuationChar :: Parser p => p Char
+punctuationChar :: Parser Char
 punctuationChar = satisfy C.isPunctuation <?> "punctuation"
 {-# INLINE punctuationChar #-}
 
-digitChar :: Parser p => Int -> p Char
+digitChar :: Int -> Parser Char
 digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
 
-asciiChar :: Parser p => Int -> p Char
+asciiChar :: Int -> Parser Char
 asciiChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE asciiChar #-}
 
-categoryChar :: Parser p => C.GeneralCategory -> p Char
+categoryChar :: C.GeneralCategory -> Parser Char
 categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
 {-# INLINE categoryChar #-}
 
-string :: Parser p => Text -> p Text
+string :: Text -> Parser Text
 string t = t <$ bytes (T.encodeUtf8 t)
 {-# INLINE string #-}
 
-string' :: Parser p => Text -> p Text
+string' :: Text -> Parser Text
 string' t =
   let tl = T.toLower t
       name = "case-insensitive " <> T.unpack tl
@@ -324,11 +324,11 @@ string' t =
     pure t'
 {-# INLINE string' #-}
 
-asString :: Parser p => p () -> p Text
+asString :: MonadParser p => p () -> p Text
 asString p = T.decodeUtf8 <$> asBytes p
 {-# INLINE asString #-}
 
-takeString :: Parser p => Int -> p Text
+takeString :: Int -> Parser Text
 takeString n = asString (skipCount n anyChar) <?> "string of length " <> show n
 {-# INLINE takeString #-}
 

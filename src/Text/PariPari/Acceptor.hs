@@ -91,7 +91,7 @@ instance Fail.MonadFail Acceptor where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance Parser Acceptor where
+instance MonadParser Acceptor where
   getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 

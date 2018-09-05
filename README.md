@@ -5,7 +5,7 @@ This allows for fast parsing in the good case without compromising on the qualit
 this idea coming up multiple times before (Trifecta after Attoparsec etc...). However this library provides both parsers
 out of the box with equivalent behaviour, in particular with respect to backtracking.
 
-Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: Parser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
+Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: MonadParser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
 PariPari operates only on strict bytestrings, which are interpreted as UTF-8 if characters are parsed.
 Conversion to bytestrings is much cheaper than operating the parser on a suboptimal input format.
@@ -14,7 +14,7 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 ## Note: Issue with specialiser
 
 As of now there is an issue with the GHC specialiser which I have yet to figure out.
-Performance of PariPari depends crucially on the specialisation of `forall p. Parser p => p a` to
+Performance of PariPari depends crucially on the specialisation of `Parser a` to
 `Acceptor a` and `Reporter a`. However in larger parsers it seems that the specialiser
 does not kick in. As a workaroundI am using the script `gen-parser-specialiser` as a
 preprocessor which enforces the specialisation of all parsers.
@@ -52,31 +52,31 @@ data Value
 A JSON toplevel value is either an object or an array.
 
 ``` haskell
-json :: Parser p => p Value
+json :: Parser Value
 json = space *> (object <|> array) <?> "json"
 ```
 
 Objects consist of pairs of a text string and a value.
 
 ``` haskell
-object :: Parser p => p Value
+object :: Parser Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser p => p (Text, Value)
+pair :: Parser (Text, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 ```
 
 Arrays are a list of values.
 
 ``` haskell
-array :: Parser p => p Value
+array :: Parser Value
 array = Array <$> (char '[' *> sepBy value (space *> char ',' *> space) <* space <* char ']') <?> "array"
 ```
 
 Furthermore, JSON supports text strings, boolean values, null and floating point numbers.
 
 ``` haskell
-value :: Parser p => p Value
+value :: Parser Value
 value =
   (String <$> text)
     <|> object
@@ -86,7 +86,7 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser p => p Text
+text :: Parser Text
 text = char '"' *> asString (skipMany $ satisfy (/= '"')) <* char '"' <?> "text"
 ```
 
@@ -95,7 +95,7 @@ the base of the exponent and the exponent. The conversion to `Double` can be don
 for example by the `scientific` library.
 
 ``` haskell
-number :: Parser p => p Value
+number :: Parser Value
 number = label "number" $ do
   neg <- option id $ negate <$ char '-'
   (c, _, e) <- fractionDec (pure ())
@@ -105,7 +105,7 @@ number = label "number" $ do
 For spaces we need another helper function.
 
 ``` haskell
-space :: Parser p => p ()
+space :: Parser ()
 space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
 ```
 

@@ -1,5 +1,6 @@
 module Text.PariPari.Class (
-  Parser(..)
+  MonadParser(..)
+  , Parser
   , Alternative(..)
   , MonadPlus
   , Pos(..)
@@ -34,7 +35,9 @@ data Error
   | ENotEnoughIndent  !Int !Int
   deriving (Eq, Ord, Show)
 
-class (MonadFail p, MonadPlus p) => Parser p where
+type Parser a = (forall p. MonadParser p => p a)
+
+class (MonadFail p, MonadPlus p) => MonadParser p where
   getFile :: p FilePath
   getPos :: p Pos
   getRefPos :: p Pos

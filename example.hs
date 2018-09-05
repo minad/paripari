@@ -1,4 +1,6 @@
 
+{-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
+
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
@@ -12,19 +14,19 @@ data Value
   | Null
   deriving (Eq, Show)
 
-json :: Parser p => p Value
+json :: Parser Value
 json = space *> (object <|> array) <?> "json"
 
-object :: Parser p => p Value
+object :: Parser Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser p => p (Text, Value)
+pair :: Parser (Text, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 
-array :: Parser p => p Value
+array :: Parser Value
 array = Array <$> (char '[' *> sepBy value (space *> char ',' *> space) <* space <* char ']') <?> "array"
 
-value :: Parser p => p Value
+value :: Parser Value
 value =
   (String <$> text)
     <|> object
@@ -34,16 +36,16 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser p => p Text
+text :: Parser Text
 text = char '"' *> asString (skipMany $ satisfy (/= '"')) <* char '"' <?> "text"
 
-number :: Parser p => p Value
+number :: Parser Value
 number = label "number" $ do
   neg <- option id $ negate <$ char '-'
   (c, _, e) <- fractionDec (pure ())
   pure $ Number (neg c) e
 
-space :: Parser p => p ()
+space :: Parser ()
 space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
 
 main :: IO ()

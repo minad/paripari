@@ -129,7 +129,7 @@ instance Fail.MonadFail Reporter where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance Parser Reporter where
+instance MonadParser Reporter where
   getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 
@@ -387,7 +387,7 @@ showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
 
 newtype Tracer a = Tracer { unTracer :: Reporter a }
-  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, Parser)
+  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, MonadParser)
 
 instance Alternative Tracer where
   empty = Tracer empty
