@@ -7,8 +7,14 @@ out of the box with equivalent behaviour, in particular with respect to backtrac
 
 Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: MonadParser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
-PariPari operates only on strict bytestrings, which are interpreted as UTF-8 if characters are parsed.
-Conversion to bytestrings is much cheaper than operating the parser on a suboptimal input format.
+PariPari operates only on strict bytestrings, which can be treated purely as binary
+using `byte` and `byteSatisfy` combinators. If characters are parsed using the `char` and
+`satisfy` combinators, the bytestring is interpreted as UTF-8 and decoded on the fly.
+
+In contrast, other parser combinator libraries often allow different stream datatypes.
+Something like this is not supported since conversion to bytestrings is much cheaper
+than operating the parser on a suboptimal input format. However as a consequence, PariPari
+is only a good fit for data which is available at once (no streaming).
 In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
 ## Note: Issue with specialiser
