@@ -62,18 +62,21 @@ module Text.ParParsec.Combinators (
   , alphaNumChar
   , digitChar
   , letterChar
+  , lowerChar
+  , upperChar
   , symbolChar
   , categoryChar
   , punctuationChar
   , spaceChar
   , asciiChar
   , string
+  , string'
   , asString
 ) where
 
 import Control.Applicative ((<|>))
 import Control.Monad (when)
-import Control.Monad.Combinators (option)
+import Control.Monad.Combinators (option, skipCount)
 import Data.List.NonEmpty (NonEmpty(..))
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
@@ -85,6 +88,7 @@ import qualified Control.Monad.Combinators.NonEmpty as ON
 import qualified Data.Char as C
 import qualified Data.Functor as F
 import qualified Data.Text.Encoding as T
+import qualified Data.Text as T
 
 infix 0 <?>
 
@@ -273,6 +277,14 @@ letterChar :: Parser p => p Char
 letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
+lowerChar :: Parser p => p Char
+lowerChar = satisfy C.isLower <?> "lowercase letter"
+{-# INLINE lowerChar #-}
+
+upperChar :: Parser p => p Char
+upperChar = satisfy C.isUpper <?> "uppercase letter"
+{-# INLINE upperChar #-}
+
 spaceChar :: Parser p => p Char
 spaceChar = satisfy C.isSpace <?> "space"
 {-# INLINE spaceChar #-}
@@ -300,6 +312,16 @@ categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
 string :: Parser p => Text -> p Text
 string t = t <$ bytes (T.encodeUtf8 t)
 {-# INLINE string #-}
+
+string' :: Parser p => Text -> p Text
+string' t =
+  let tl = T.toLower t
+      name = "case-insensitive " <> T.unpack tl
+  in label name $ do
+    t' <- asString (skipCount (T.length tl) anyChar)
+    when (T.toLower t' /= tl) $ failWith $ EExpected [name]
+    pure t'
+{-# INLINE string' #-}
 
 asString :: Parser p => p () -> p Text
 asString p = T.decodeUtf8 <$> asBytes p
