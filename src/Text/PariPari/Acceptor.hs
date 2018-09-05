@@ -1,12 +1,12 @@
-module Text.ParParsec.Acceptor (
+module Text.PariPari.Acceptor (
   Acceptor
   , runAcceptor
 ) where
 
 import Control.Monad (void, when)
-import Text.ParParsec.Ascii
-import Text.ParParsec.Class
-import Text.ParParsec.Decode
+import Text.PariPari.Ascii
+import Text.PariPari.Class
+import Text.PariPari.Decode
 import Foreign.ForeignPtr (ForeignPtr)
 import qualified Control.Monad.Fail as Fail
 import qualified Data.ByteString.Internal as B

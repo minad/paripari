@@ -1,18 +1,18 @@
-module Text.ParParsec (
-  module Text.ParParsec.Class
-  , module Text.ParParsec.Combinators
-  , module Text.ParParsec.Acceptor
-  , module Text.ParParsec.Reporter
+module Text.PariPari (
+  module Text.PariPari.Class
+  , module Text.PariPari.Combinators
+  , module Text.PariPari.Acceptor
+  , module Text.PariPari.Reporter
   , runParser
   , runSeqParser
   , runParserWithOptions
   , runSeqParserWithOptions
 ) where
 
-import Text.ParParsec.Acceptor
-import Text.ParParsec.Class
-import Text.ParParsec.Combinators
-import Text.ParParsec.Reporter
+import Text.PariPari.Acceptor
+import Text.PariPari.Class
+import Text.PariPari.Combinators
+import Text.PariPari.Reporter
 import GHC.Conc (par)
 
 -- Inline to force the specializer to kick in

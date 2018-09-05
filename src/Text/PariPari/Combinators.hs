@@ -1,4 +1,4 @@
-module Text.ParParsec.Combinators (
+module Text.PariPari.Combinators (
   -- * Basics
   Text
   , F.void
@@ -32,7 +32,7 @@ module Text.ParParsec.Combinators (
   , O.skipManyTill
   , O.skipSomeTill
 
-  -- * ParParsec
+  -- * PariPari
   , (<?>)
   , getLine
   , getColumn
@@ -79,8 +79,8 @@ import Control.Applicative ((<|>))
 import Control.Monad (when)
 import Control.Monad.Combinators (option, skipCount)
 import Data.List.NonEmpty (NonEmpty(..))
-import Text.ParParsec.Ascii
-import Text.ParParsec.Class
+import Text.PariPari.Ascii
+import Text.PariPari.Class
 import Data.Text (Text)
 import Prelude hiding (getLine)
 import qualified Control.Applicative as A
@@ -229,7 +229,7 @@ isDigit base b
   | base <= 36 = (b >= asc_0 && b <= asc_9)
                  || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
                  || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
-  |otherwise = error "Text.ParParsec.Combinators.isDigit: Bases 2 to 36 are supported"
+  |otherwise = error "Text.PariPari.Combinators.isDigit: Bases 2 to 36 are supported"
 {-# INLINE isDigit #-}
 
 signed :: (Num a, Parser p) => p a -> p a

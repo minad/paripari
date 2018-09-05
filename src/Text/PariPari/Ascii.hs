@@ -1,5 +1,5 @@
-module Text.ParParsec.Ascii (
-  module Text.ParParsec.Ascii
+module Text.PariPari.Ascii (
+  module Text.PariPari.Ascii
 ) where
 
 import Data.ByteString (ByteString)

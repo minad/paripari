@@ -1,6 +1,6 @@
-name: parparsec
+name: paripari
 version: 0.1.0.0
-synopsis: Parser combinator library with parallel parsing strategy
+synopsis: Fast Parser combinator library with two strategies (Fast acceptor and slow with good errors)
 description: The parser combinator library provides two Parser instances. There is a fast Acceptor and a slow error-reporting Reporter which are evaluated in parallel. If the Acceptor fails, errors are reported by the Reporter. Like attoparsec, the parser combinators backtrack by default.
 category: Text
 stability: experimental
@@ -8,7 +8,7 @@ author: Daniel Mendler <mail@daniel-mendler.de>
 maintainer: Daniel Mendler <mail@daniel-mendler.de>
 copyright: 2018 Daniel Mendler
 license: MIT
-github: minad/parparsec
+github: minad/paripari
 
 tested-with:
   GHC == 8.2.1,
@@ -44,4 +44,4 @@ library:
 executables:
   example:
     main: example.hs
-    dependencies: parparsec
+    dependencies: paripari

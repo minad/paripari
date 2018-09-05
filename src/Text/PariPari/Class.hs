@@ -1,4 +1,4 @@
-module Text.ParParsec.Class (
+module Text.PariPari.Class (
   Parser(..)
   , Alternative(..)
   , MonadPlus

@@ -1,4 +1,4 @@
-module Text.ParParsec.Decode (
+module Text.PariPari.Decode (
   bytesEqual
   , byteAt
   , utf8Decode

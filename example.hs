@@ -1,7 +1,7 @@
 -- Adapted from parsers-bench by @mrkkrp
 
 import System.Environment (getArgs)
-import Text.ParParsec
+import Text.PariPari
 import qualified Data.ByteString as B
 
 data Value

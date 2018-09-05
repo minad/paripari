@@ -1,4 +1,4 @@
-module Text.ParParsec.Reporter (
+module Text.PariPari.Reporter (
   Reporter
   , Report(..)
   , runReporter
@@ -18,9 +18,9 @@ import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Debug.Trace (trace)
 import Foreign.ForeignPtr (ForeignPtr)
-import Text.ParParsec.Ascii
-import Text.ParParsec.Class
-import Text.ParParsec.Decode
+import Text.PariPari.Ascii
+import Text.PariPari.Class
+import Text.PariPari.Decode
 import qualified Control.Monad.Fail as Fail
 import qualified Data.ByteString.Internal as B
 import qualified Data.List.NonEmpty as NE
