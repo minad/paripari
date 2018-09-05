@@ -25,7 +25,7 @@ Performance of PariPari depends crucially on the specialisation of `Parser a` to
 does not kick in. As a workaroundI am using the script `gen-parser-specialiser` as a
 preprocessor which enforces the specialisation of all parsers.
 
-``` haskell
+```
 {-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
 ```
 

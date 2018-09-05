@@ -1,6 +1,4 @@
 
-{-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
-
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
