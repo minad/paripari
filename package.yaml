@@ -36,3 +36,6 @@ dependencies:
 - text               >= 0.11 && < 1.3
 - bytestring         >= 0.10 && < 0.11
 - parser-combinators >= 1.0  && < 1.1
+
+library:
+  source-dirs: src
