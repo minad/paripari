@@ -334,15 +334,11 @@ string :: Text -> Parser Text
 string t = t <$ bytes (T.encodeUtf8 t)
 {-# INLINE string #-}
 
--- | Parse a case-insensitive 'Text' string
 string' :: Text -> Parser Text
-string' t =
-  let tl = T.toLower t
-      name = "case-insensitive " <> T.unpack tl
-  in label name $ do
-    t' <- asString (skipCount (T.length tl) anyChar)
-    when (T.toLower t' /= tl) $ failWith $ EExpected [name]
-    pure t'
+string' s = asString (go s) <?> "case-insensitive \"" <> T.unpack (T.toLower s) <> "\""
+  where go t
+          | T.null t  = pure ()
+          | otherwise = char' (T.head t) *> go (T.tail t)
 {-# INLINE string' #-}
 
 -- | Run the given parser but return the result as a 'Text' string
