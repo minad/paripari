@@ -2,12 +2,12 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 52c6df925eae6892633485b11759aa6e59997c1dcc07d683f993784b61647d58
+-- hash: 4ecedf2a4c17f3c372dbccc205bc11a765217699ec52eeed89baba90bb39f9f9
 
 name:           paripari
 version:        0.1.0.0
 synopsis:       Fast parser combinator library with two strategies (Fast acceptor and slow with good errors)
-description:    The parser combinator library provides two Parser instances. There is a fast Acceptor and a slow error-reporting Reporter which are evaluated in parallel. If the Acceptor fails, errors are reported by the Reporter. Unlike Parsec and like Atttoparsec, the parser combinators backtrack by default.
+description:    The parser combinator library provides two Parser instances. There is a fast Acceptor and a slow error-reporting Reporter which are evaluated in parallel. If the Acceptor fails, errors are reported by the Reporter. Unlike Parsec and like Attoparsec, the parser combinators backtrack by default.
 category:       Text
 stability:      experimental
 homepage:       https://github.com/minad/paripari#readme

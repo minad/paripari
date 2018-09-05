@@ -1,4 +1,3 @@
--- Adapted from parsers-bench by @mrkkrp
 
 import System.Environment (getArgs)
 import Text.PariPari
@@ -38,14 +37,14 @@ value =
 text :: Parser p => p Text
 text = char '"' *> asString (skipMany $ satisfy (/= '"')) <* char '"' <?> "text"
 
-space :: Parser p => p ()
-space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
-
 number :: Parser p => p Value
 number = label "number" $ do
   neg <- option id $ negate <$ char '-'
   (c, _, e) <- fractionDec (pure ())
   pure $ Number (neg c) e
+
+space :: Parser p => p ()
+space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
 
 main :: IO ()
 main = do
