@@ -2,13 +2,16 @@ module Text.ParParsec.Reporter (
   Reporter
   , Report(..)
   , runReporter
+  , runReporterWithOptions
   , ErrorContext
   , showErrorContexts
+  , ReportOptions(..)
+  , defaultReportOptions
 ) where
 
 import Control.Monad (void)
 import Data.Function (on)
-import Data.List (intercalate, nub, sortOn)
+import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Foreign.ForeignPtr (ForeignPtr)
 import Text.ParParsec.Ascii
@@ -19,6 +22,12 @@ import qualified Data.ByteString.Internal as B
 import qualified Data.List.NonEmpty as NE
 
 type ErrorContext = ([Error], [String])
+
+data ReportOptions = ReportOptions
+  { _optMaxContexts         :: !Int
+  , _optMaxErrorsPerContext :: !Int
+  , _optMaxLabelsPerContext :: !Int
+  }
 
 data Report = Report
   { _reportFile   :: !FilePath
@@ -31,6 +40,7 @@ data Env = Env
   { _envSrc     :: !(ForeignPtr Word8)
   , _envEnd     :: !Int
   , _envFile    :: !FilePath
+  , _envOptions :: !ReportOptions
   , _envHidden  :: !Bool
   , _envCommit  :: !Int
   , _envContext :: [String]
@@ -88,7 +98,7 @@ instance Alternative Reporter where
   {-# INLINE empty #-}
 
   p1 <|> p2 = Reporter $ \env st ok err ->
-    let err' s' = unReporter p2 env (mergeError st s') ok err
+    let err' s' = unReporter p2 env (mergeError env st s') ok err
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
@@ -235,7 +245,7 @@ get f = Reporter $ \env st ok _ -> ok (f env st) st
 addLabel :: String -> Env -> Env
 addLabel l env = case _envContext env of
   (l':_) | l == l' -> env
-  ls               -> env { _envContext = take maxLabelsPerContext $ l : ls }
+  ls               -> env { _envContext = take (_optMaxLabelsPerContext._envOptions $ env) $ l : ls }
 {-# INLINE addLabel #-}
 
 addError :: Env -> State -> Error -> State
@@ -250,7 +260,7 @@ addError env st e
          }
   | _stOff st == _stErrOff st && _envCommit env == _stErrCommit st,
     Just e' <- mkError env e =
-      st { _stErrors = shrinkErrors $ e' : _stErrors st }
+      st { _stErrors = shrinkErrors env $ e' : _stErrors st }
   | otherwise = st
 {-# INLINE addError #-}
 
@@ -261,8 +271,8 @@ mkError env e
   | otherwise = Just $ ([e], _envContext env)
 {-# INLINE mkError #-}
 
-mergeError :: State -> State -> State
-mergeError s s'
+mergeError :: Env -> State -> State -> State
+mergeError env s s'
   | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
@@ -271,52 +281,57 @@ mergeError s s'
         , _stErrCommit = _stErrCommit s'
         }
   | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
-      s { _stErrors = shrinkErrors $ _stErrors s' <> _stErrors s }
+      s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
   | otherwise = s
 {-# INLINE mergeError #-}
 
 groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
 
-shrinkErrors :: [ErrorContext] -> [ErrorContext]
-shrinkErrors = take maxErrorContexts . map mergeErrorContexts . groupOn snd . sortOn snd
+shrinkErrors :: Env -> [ErrorContext] -> [ErrorContext]
+shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn snd . sortOn snd
 
-mergeErrorContexts :: NonEmpty ErrorContext -> ErrorContext
-mergeErrorContexts es@((_, ctx):| _) = (take maxErrorsPerContext $ nub $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
+mergeErrorContexts :: Env -> NonEmpty ErrorContext -> ErrorContext
+mergeErrorContexts env es@((_, ctx):| _) = (take (_optMaxErrorsPerContext._envOptions $ env) $ nubSort $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
 
 mergeEExpected :: [Error] -> [Error]
-mergeEExpected es = [EExpected $ nub expects | not (null expects)] <> filter (null . asEExpected) es
+mergeEExpected es = [EExpected $ nubSort expects | not (null expects)] <> filter (null . asEExpected) es
   where expects = concatMap asEExpected es
+
+nubSort :: Ord a => [a] -> [a]
+nubSort = map head . group . sort
 
 asEExpected :: Error -> [String]
 asEExpected (EExpected s) = s
 asEExpected _ = []
 
-maxErrorContexts :: Int
-maxErrorContexts = 20
-
-maxErrorsPerContext :: Int
-maxErrorsPerContext = 20
-
-maxLabelsPerContext :: Int
-maxLabelsPerContext = 5
+runReporterWithOptions :: ReportOptions -> Reporter a -> FilePath -> ByteString -> Either Report a
+runReporterWithOptions o p f t =
+  let b = t <> "\0\0\0"
+  in unReporter p (initialEnv o f b) (initialState b) (\x _ -> Right x) (Left . getReport f)
 
 runReporter :: Reporter a -> FilePath -> ByteString -> Either Report a
-runReporter p f t =
-  let b = t <> "\0\0\0"
-  in unReporter p (initialEnv f b) (initialState b) (\x _ -> Right x) (Left . getReport f)
+runReporter = runReporterWithOptions defaultReportOptions
 
 getReport :: FilePath -> State -> Report
 getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stErrors s)
 
-initialEnv :: FilePath -> ByteString -> Env
-initialEnv _envFile (B.PS _envSrc off len) = Env
+initialEnv :: ReportOptions -> FilePath -> ByteString -> Env
+initialEnv _envOptions _envFile (B.PS _envSrc off len) = Env
   { _envFile
   , _envSrc
+  , _envOptions
   , _envEnd     = off + len - 3
   , _envContext = []
   , _envHidden  = False
   , _envCommit  = 0
+  }
+
+defaultReportOptions :: ReportOptions
+defaultReportOptions = ReportOptions
+  { _optMaxContexts         = 20
+  , _optMaxErrorsPerContext = 20
+  , _optMaxLabelsPerContext = 5
   }
 
 initialState :: ByteString -> State

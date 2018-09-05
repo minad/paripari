@@ -4,7 +4,9 @@ module Text.ParParsec (
   , module Text.ParParsec.Acceptor
   , module Text.ParParsec.Reporter
   , runParser
-  , runParser'
+  , runSeqParser
+  , runParserWithOptions
+  , runSeqParserWithOptions
 ) where
 
 import Text.ParParsec.Acceptor
@@ -15,19 +17,27 @@ import GHC.Conc (par)
 
 -- Inline to force the specializer to kick in
 runParser :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
-runParser p f b =
+runParser = runParserWithOptions defaultReportOptions
+{-# INLINE runParser #-}
+
+runSeqParser :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
+runSeqParser = runSeqParserWithOptions defaultReportOptions
+{-# INLINE runSeqParser #-}
+
+runParserWithOptions :: ReportOptions -> (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
+runParserWithOptions o p f b =
   let a = runAcceptor p f b
-      r = runReporter p f b
+      r = runReporterWithOptions o p f b
   in case r `par` a of
        Left _  -> r
        Right x -> Right x
-{-# INLINE runParser #-}
+{-# INLINE runParserWithOptions #-}
 
-runParser' :: (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
-runParser' p f b =
+runSeqParserWithOptions :: ReportOptions -> (forall p. Parser p => p a) -> FilePath -> ByteString -> Either Report a
+runSeqParserWithOptions o p f b =
   let a = runAcceptor p f b
-      r = runReporter p f b
+      r = runReporterWithOptions o p f b
   in case a of
        Left _  -> r
        Right x -> Right x
-{-# INLINE runParser' #-}
+{-# INLINE runSeqParserWithOptions #-}

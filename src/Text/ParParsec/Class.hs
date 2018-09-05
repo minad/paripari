@@ -32,7 +32,7 @@ data Error
   | EIndentNotAligned !Int !Int
   | EIndentOverLine   !Int !Int
   | ENotEnoughIndent  !Int !Int
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 class (MonadFail p, MonadPlus p) => Parser p where
   getFile :: p FilePath
