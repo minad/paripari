@@ -229,6 +229,17 @@ Benchmark bench-speed: FINISH
 * Mark Karpov @mrkkrp - For the parser-combinators library, which was extracted from megaparsec and parsers-bench.
   The json example above is adapted from parsers-bench.
 
+## Related projects
+
+* [parser-combinators](http://hackage.haskell.org/package/parser-combinators)
+* [parsec](http://hackage.haskell.org/package/parsec)
+* [megaparsec](http://hackage.haskell.org/package/megaparsec)
+* [attoparsec](http://hackage.haskell.org/package/attoparsec)
+* [Earley](http://hackage.haskell.org/package/Earley)
+* [trifecta](http://hackage.haskell.org/package/trifecta)
+* [parsix](http://hackage.haskell.org/package/parsix)
+* [uu-parsinglib](http://hackage.haskell.org/package/uu-parsinglib)
+
 ## License
 
 Released under the MIT License.
