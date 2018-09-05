@@ -15,15 +15,24 @@ import Text.PariPari.Combinators
 import Text.PariPari.Reporter
 import GHC.Conc (par)
 
--- Inline to force the specializer to kick in
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **in parallel**.
+-- The 'FilePath' is used for error reporting.
+-- When the acceptor does not return successfully, the result from the reporter
+-- is awaited.
 runParser :: Parser a -> FilePath -> ByteString -> Either Report a
 runParser = runParserWithOptions defaultReportOptions
 {-# INLINE runParser #-}
+-- Inline to force the specializer to kick in
 
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **sequentially**.
+-- The 'FilePath' is used for error reporting.
+-- When the acceptor does not return successfully, the result from the reporter
+-- is awaited.
 runSeqParser :: Parser a -> FilePath -> ByteString -> Either Report a
 runSeqParser = runSeqParserWithOptions defaultReportOptions
 {-# INLINE runSeqParser #-}
 
+-- | Run parsers **in parallel** with additional 'ReportOptions'.
 runParserWithOptions :: ReportOptions -> Parser a -> FilePath -> ByteString -> Either Report a
 runParserWithOptions o p f b =
   let a = runAcceptor p f b
@@ -33,6 +42,7 @@ runParserWithOptions o p f b =
        Right x -> Right x
 {-# INLINE runParserWithOptions #-}
 
+-- | Run parsers **sequentially** with additional 'ReportOptions'.
 runSeqParserWithOptions :: ReportOptions -> Parser a -> FilePath -> ByteString -> Either Report a
 runSeqParserWithOptions o p f b =
   let a = runAcceptor p f b

@@ -63,6 +63,9 @@ data State = State
   , _stErrors    :: [ErrorContext]
   }
 
+-- | Parser which is optimized for good error reports.
+-- Performance is secondary, since the 'Reporter' is used
+-- as a fallback to the 'Acceptor'.
 newtype Reporter a = Reporter
   { unReporter :: forall b. Env -> State
                -> (a     -> State -> b)
@@ -325,11 +328,14 @@ asEExpected :: Error -> [String]
 asEExpected (EExpected s) = s
 asEExpected _ = []
 
+-- | Run 'Reporter' with additional 'ReportOptions'.
 runReporterWithOptions :: ReportOptions -> Reporter a -> FilePath -> ByteString -> Either Report a
 runReporterWithOptions o p f t =
   let b = t <> "\0\0\0"
   in unReporter p (initialEnv o f b) (initialState b) (\x _ -> Right x) (Left . getReport f)
 
+-- | Run 'Reporter' on the given 'ByteString', returning either
+-- an error 'Report' or, if successful, the result.
 runReporter :: Reporter a -> FilePath -> ByteString -> Either Report a
 runReporter = runReporterWithOptions defaultReportOptions
 
@@ -368,6 +374,7 @@ initialState (B.PS _ _stOff _) = State
   , _stErrors    = []
   }
 
+-- | Pretty string representation of 'Report'.
 showReport :: Report -> String
 showReport r =
   "Parser errors at " <> _reportFile r
@@ -375,6 +382,7 @@ showReport r =
   <> ", column " <> show (_reportCol r)
   <> "\n\n" <> showErrors (_reportErrors r)
 
+-- | Pretty string representation of '[ErrorContext]'.
 showErrors :: [ErrorContext] -> String
 showErrors [] = "No errors"
 showErrors es = intercalate "\n" $ map showErrorContext es
@@ -386,6 +394,7 @@ showContext :: [String] -> String
 showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
 
+-- | Parser which prints trace messages, when backtracking occurs.
 newtype Tracer a = Tracer { unTracer :: Reporter a }
   deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, MonadParser)
 
@@ -404,5 +413,7 @@ instance Alternative Tracer where
                next
     in unReporter (unTracer p1) env st ok err'
 
+-- | Run 'Tracer' on the given 'ByteString', returning either
+-- an error 'Report' or, if successful, the result.
 runTracer :: Tracer a -> FilePath -> ByteString -> Either Report a
 runTracer = runReporter . unTracer

@@ -25,6 +25,8 @@ data State = State
   , _stCol     :: !Int
   }
 
+-- | Parser which is optimized for fast parsing. Error reporting
+-- is minimal.
 newtype Acceptor a = Acceptor
   { unAcceptor :: forall b. Env -> State
                -> (a     -> State -> b)
@@ -220,6 +222,8 @@ local f p = Acceptor $ \env st ok err ->
   unAcceptor p (f st env) st ok err
 {-# INLINE local #-}
 
+-- | Run 'Acceptor' on the given 'ByteString', returning either
+-- a simple 'Error' or, if successful, the result.
 runAcceptor :: Acceptor a -> FilePath -> ByteString -> Either Error a
 runAcceptor p f t =
   let b = t <> "\0\0\0"
