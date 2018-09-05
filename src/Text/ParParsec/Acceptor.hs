@@ -3,7 +3,7 @@ module Text.ParParsec.Acceptor (
   , runAcceptor
 ) where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Text.ParParsec.Ascii
 import Text.ParParsec.Class
 import Text.ParParsec.Decode
@@ -166,6 +166,14 @@ instance Parser Acceptor where
     src <- get (\env _ -> _envSrc env)
     pure $ B.PS src begin (end - begin)
   {-# INLINE asBytes #-}
+
+  takeBytes n = do
+    begin <- get (const _stOff)
+    end <- get (\env _ -> _envEnd env)
+    when (begin + n > end) $ failWith $ ECombinator "takeBytes"
+    src <- get (\env _ -> _envSrc env)
+    pure $ B.PS src begin n
+  {-# INLINE takeBytes #-}
 
   satisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let (c, w) = utf8Decode (_envSrc env) _stOff

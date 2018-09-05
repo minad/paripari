@@ -12,7 +12,7 @@ module Text.ParParsec.Reporter (
   , runTracer
 ) where
 
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
@@ -204,6 +204,14 @@ instance Parser Reporter where
     src <- get (\env _ -> _envSrc env)
     pure $ B.PS src begin (end - begin)
   {-# INLINE asBytes #-}
+
+  takeBytes n = do
+    begin <- get (const _stOff)
+    end <- get (\env _ -> _envEnd env)
+    when (begin + n > end) $ failWith $ EExpected [show n <> " bytes"]
+    src <- get (\env _ -> _envSrc env)
+    pure $ B.PS src begin n
+  {-# INLINE takeBytes #-}
 
   satisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let (c, w) = utf8Decode (_envSrc env) _stOff

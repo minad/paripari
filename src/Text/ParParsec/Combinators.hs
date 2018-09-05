@@ -72,6 +72,7 @@ module Text.ParParsec.Combinators (
   , string
   , string'
   , asString
+  , takeString
 ) where
 
 import Control.Applicative ((<|>))
@@ -326,6 +327,10 @@ string' t =
 asString :: Parser p => p () -> p Text
 asString p = T.decodeUtf8 <$> asBytes p
 {-# INLINE asString #-}
+
+takeString :: Parser p => Int -> p Text
+takeString n = asString (skipCount n anyChar) <?> "string of length " <> show n
+{-# INLINE takeString #-}
 
 untitle :: String -> String
 untitle []     = []

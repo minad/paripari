@@ -52,6 +52,7 @@ class (MonadFail p, MonadPlus p) => Parser p where
   byteSatisfy :: (Word8 -> Bool) -> p Word8
   bytes :: ByteString -> p ByteString
   asBytes :: p () -> p ByteString
+  takeBytes :: Int -> p ByteString
 
 showError :: Error -> String
 showError EEmpty                   = "No error"
