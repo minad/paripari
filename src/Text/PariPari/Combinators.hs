@@ -50,6 +50,10 @@ module Text.PariPari.Combinators (
   , digitByte
   , asciiByte
   , integer
+  , integer'
+  , decimal
+  , octal
+  , hexadecimal
   , digit
   , signed
   , fractionHex
@@ -187,10 +191,11 @@ digitByte base = byteSatisfy (isDigit base)
 {-# INLINE digitByte #-}
 
 -- | Parse an integer of the given base.
+-- Returns the integer and the number of digits.
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
-integer :: (Num a, MonadParser p) => p sep -> Int -> p (a, Int)
-integer sep base = label (integerLabel base) $ do
+integer' :: (Num a, MonadParser p) => p sep -> Int -> p (a, Int)
+integer' sep base = label (integerLabel base) $ do
   d <- digit base
   accum 1 $ fromIntegral d
   where accum !i !n = next i n <|> pure (n, i)
@@ -198,6 +203,20 @@ integer sep base = label (integerLabel base) $ do
           sep
           d <- digit base
           accum (i + 1) $ n * fromIntegral base + fromIntegral d
+{-# INLINE integer' #-}
+
+-- | Parse an integer of the given base.
+-- Bases 2 to 36 are supported.
+-- Digits can be separated by separator, e.g. `optional (char '_')`.
+integer :: (Num a, MonadParser p) => p sep -> Int -> p a
+integer sep base = label (integerLabel base) $ do
+  d <- digit base
+  accum $ fromIntegral d
+  where accum !n = next n <|> pure n
+        next !n = do
+          sep
+          d <- digit base
+          accum $ n * fromIntegral base + fromIntegral d
 {-# INLINE integer #-}
 
 integerLabel :: Int -> String
@@ -206,6 +225,18 @@ integerLabel 8  = "octal integer"
 integerLabel 10 = "decimal integer"
 integerLabel 16 = "hexadecimal integer"
 integerLabel b  = "integer of base " <> show b
+
+decimal :: Num a => Parser a
+decimal = integer (pure ()) 10
+{-# INLINE decimal #-}
+
+octal :: Num a => Parser a
+octal = integer (pure ()) 8
+{-# INLINE octal #-}
+
+hexadecimal :: Num a => Parser a
+hexadecimal = integer (pure ()) 16
+{-# INLINE hexadecimal #-}
 
 digitToInt :: Int -> Word8 -> Word
 digitToInt base b
@@ -239,10 +270,10 @@ signed p = ($) <$> ((id <$ byte asc_plus) <|> (negate <$ byte asc_minus) <|> pur
 fraction :: (Num a, MonadParser p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
-  coeff <- fst <$> integer digitSep coeffBase
+  coeff <- integer digitSep coeffBase
   A.optional $ byte asc_point
-  (frac, fracLen) <- option (0, 0) $ integer digitSep coeffBase
-  expVal <- option 0 $ expSep *> signed (fst <$> integer digitSep 10)
+  (frac, fracLen) <- option (0, 0) $ integer' digitSep coeffBase
+  expVal <- option 0 $ expSep *> signed (integer digitSep 10)
   pure (coeff * fromIntegral coeffBase ^ fracLen + frac,
         expBase,
         expVal - fromIntegral (fracLen * coeffBasePow))
