@@ -28,8 +28,9 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 
 In this example we use PariPari to parse JSON. The following is literate haskell.
 
-### Specialising all parsers
+### Prologue
 
+We specify a preprocessor, language pragmas and the library imports.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
 GHC specialiser does not kick in. As a workaround we use the `specialise-all` as a
