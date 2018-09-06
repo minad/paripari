@@ -5,7 +5,7 @@ This allows for fast parsing in the good case without compromising on the qualit
 this idea coming up multiple times before (Trifecta after Attoparsec etc...). However this library provides both parsers
 out of the box with equivalent behaviour, in particular with respect to backtracking.
 
-Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: MonadParser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
+Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
 PariPari operates on strict `ByteString` and `Text`. If characters are parsed using the `char` and
 `satisfy` combinators, bytestrings are interpreted as UTF-8 and decoded on the fly.
@@ -27,8 +27,8 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 ## Note: Issue with specialiser
 
 As of now there is an issue with the GHC specialiser which I have yet to figure out.
-Performance of PariPari depends crucially on the specialisation of `Parser a` to
-`Acceptor a` and `Reporter a`. However in larger parsers it seems that the specialiser
+Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
+`Acceptor ByteString a` and `Reporter ByteString a`. However in larger parsers it seems that the specialiser
 does not kick in. As a workaround I am using the script `gen-parser-specialiser` as a
 preprocessor which enforces the specialisation of all parsers.
 
