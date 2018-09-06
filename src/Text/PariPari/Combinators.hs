@@ -1,11 +1,10 @@
 module Text.PariPari.Combinators (
   -- * Basics
   Text
-  , F.void
-  , (A.<|>)
-  , A.empty
-  , A.optional
-  , A.many
+  , void
+  , (<|>)
+  , empty
+  , optional
 
   -- * Control.Monad.Combinators.NonEmpty
   , NonEmpty(..)
@@ -16,6 +15,7 @@ module Text.PariPari.Combinators (
   , ON.sepEndBy1
 
   -- * Control.Monad.Combinators
+  , O.many -- dont use Applicative version for efficiency
   , O.between
   , O.choice
   , O.count
@@ -75,32 +75,31 @@ module Text.PariPari.Combinators (
   , string'
   , asString
   , takeBytes
-  , takeChars
-  , takeCharsWhile
-  , takeBytesWhile
-  , takeCharsWhile1
-  , takeBytesWhile1
-  , skipBytes
   , skipChars
+  , skipBytes
+  , takeChars
   , skipCharsWhile
+  , takeCharsWhile
   , skipBytesWhile
-  , skipCharsWhile1
+  , takeBytesWhile
   , skipBytesWhile1
+  , takeBytesWhile1
+  , skipCharsWhile1
+  , takeCharsWhile1
 ) where
 
-import Control.Applicative ((<|>), optional)
-import Control.Monad (when, void)
+import Control.Applicative ((<|>), empty, optional)
+import Control.Monad (when)
 import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.List.NonEmpty (NonEmpty(..))
 import Text.PariPari.Ascii
 import Text.PariPari.Class
 import Data.Text (Text)
+import Data.Functor (void)
 import Prelude hiding (getLine)
-import qualified Control.Applicative as A
 import qualified Control.Monad.Combinators as O
 import qualified Control.Monad.Combinators.NonEmpty as ON
 import qualified Data.Char as C
-import qualified Data.Functor as F
 import qualified Data.Text.Encoding as T
 import qualified Data.Text as T
 
