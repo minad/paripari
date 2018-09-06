@@ -28,16 +28,13 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 
 As of now there is an issue with the GHC specialiser which I have yet to figure out.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
-`Acceptor ByteString a` and `Reporter ByteString a`. However in larger parsers it seems that the specialiser
+`Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the specialiser
 does not kick in. As a workaround I am using the script `gen-parser-specialiser` as a
 preprocessor which enforces the specialisation of all parsers.
 
 ```
 {-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
 ```
-
-For smaller examples it works as desired though. The benchmarks below were obtained without
-the specialiser hack.
 
 ## Example
 
