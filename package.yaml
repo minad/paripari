@@ -32,6 +32,9 @@ dependencies:
 library:
   source-dirs: src
 
+extra-source-files:
+- specialise-all
+
 executables:
   example:
     main: example.hs

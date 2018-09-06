@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0fecef05436cf2bf2c831c206a3b59ca174b64c75c0f7c424720f8a6fcbb4e2e
+-- hash: c33d8269065d94e7fbcbb78d41e648fda256c415f440152bf6534395704fa7f6
 
 name:           paripari
 version:        0.1.0.0
@@ -20,6 +20,8 @@ license-file:   LICENSE
 tested-with:    GHC == 8.4.3, GHC == 8.6.1
 build-type:     Simple
 cabal-version:  >= 1.10
+extra-source-files:
+    specialise-all
 
 source-repository head
   type: git
