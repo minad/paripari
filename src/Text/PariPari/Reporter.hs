@@ -17,13 +17,10 @@ import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
 import Debug.Trace (trace)
-import Foreign.ForeignPtr (ForeignPtr)
 import GHC.Generics (Generic)
-import Text.PariPari.Ascii
+import Text.PariPari.Internal
 import Text.PariPari.Class
-import Text.PariPari.Decode
 import qualified Control.Monad.Fail as Fail
-import qualified Data.ByteString.Internal as B
 import qualified Data.List.NonEmpty as NE
 
 type ErrorContext = ([Error], [String])
@@ -41,8 +38,8 @@ data Report = Report
   , _reportErrors :: [ErrorContext]
   } deriving (Eq, Show, Generic)
 
-data Env = Env
-  { _envSrc     :: !(ForeignPtr Word8)
+data Env k = Env
+  { _envBuf     :: !(Buffer k)
   , _envEnd     :: !Int
   , _envFile    :: !FilePath
   , _envOptions :: !ReportOptions
@@ -67,27 +64,27 @@ data State = State
 -- | Parser which is optimized for good error reports.
 -- Performance is secondary, since the 'Reporter' is used
 -- as a fallback to the 'Acceptor'.
-newtype Reporter a = Reporter
-  { unReporter :: forall b. Env -> State
+newtype Reporter k a = Reporter
+  { unReporter :: forall b. Env k -> State
                -> (a     -> State -> b)
                -> (State -> b)
                -> b
   }
 
-instance Semigroup a => Semigroup (Reporter a) where
+instance (Chunk k, Semigroup a) => Semigroup (Reporter k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
   {-# INLINE (<>) #-}
 
-instance Monoid a => Monoid (Reporter a) where
+instance (Chunk k, Monoid a) => Monoid (Reporter k a) where
   mempty = pure mempty
   {-# INLINE mempty #-}
 
-instance Functor Reporter where
+instance Chunk k => Functor (Reporter k) where
   fmap f p = Reporter $ \env st ok err ->
     unReporter p env st (ok . f) err
   {-# INLINE fmap #-}
 
-instance Applicative Reporter where
+instance Chunk k => Applicative (Reporter k) where
   pure x = Reporter $ \_ st ok _ -> ok x st
   {-# INLINE pure #-}
 
@@ -109,7 +106,7 @@ instance Applicative Reporter where
     pure x
   {-# INLINE (<*) #-}
 
-instance Alternative Reporter where
+instance Chunk k => Alternative (Reporter k) where
   empty = Reporter $ \_ st _ err -> err st
   {-# INLINE empty #-}
 
@@ -118,9 +115,9 @@ instance Alternative Reporter where
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
-instance MonadPlus Reporter
+instance Chunk k => MonadPlus (Reporter k)
 
-instance Monad Reporter where
+instance Chunk k => Monad (Reporter k) where
   p >>= f = Reporter $ \env st ok err ->
     let ok' x s = unReporter (f x) env s ok err
     in unReporter p env st ok' err
@@ -129,11 +126,11 @@ instance Monad Reporter where
   fail msg = Fail.fail msg
   {-# INLINE fail #-}
 
-instance Fail.MonadFail Reporter where
+instance Chunk k => Fail.MonadFail (Reporter k) where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance MonadParser Reporter where
+instance Chunk k => ChunkParser k (Reporter k) where
   getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 
@@ -176,53 +173,48 @@ instance MonadParser Reporter where
       raiseError env st err EExpectedEnd
   {-# INLINE eof #-}
 
-  byte b = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  element e = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff >= _envEnd env -> err st
-       | b == byteAt (_envSrc env) _stOff ->
-           ok b st
-           { _stOff =_stOff + 1
-           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-           , _stCol = if b == asc_newline then 1 else _stCol + 1
-           }
+       | (e', w) <- elementAt @k (_envBuf env) _stOff, e == e',
+         pos <- elementPos @k e (Pos _stLine _stCol) ->
+           ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
        | otherwise ->
-           raiseError env st err $ EExpected [showByte b]
-  {-# INLINE byte #-}
+           raiseError env st err $ EExpected [showElement @k e]
+  {-# INLINE element #-}
 
-  byteSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let b = byteAt (_envSrc env) _stOff
+  elementSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    let (e, w) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env -> err st
-          | f b ->
-              ok b st
-              { _stOff =_stOff + 1
-              , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b == asc_newline then 1 else _stCol + 1
-              }
+          | f e, pos <- elementPos @k e (Pos _stLine _stCol) ->
+              ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
           | otherwise ->
-              raiseError env st err $ EUnexpected $ showByte b
-  {-# INLINE byteSatisfy #-}
+              raiseError env st err $ EUnexpected $ showElement @k e
+  {-# INLINE elementSatisfy #-}
 
-  bytes b@(B.PS p i n) = Reporter $ \env st@State{_stOff,_stCol} ok err ->
-    if n + _stOff <= _envEnd env &&
-       bytesEqual (_envSrc env) _stOff p i n then
-      ok b st { _stOff = _stOff + n, _stCol = _stCol + n }
-    else
-      raiseError env st err $ EExpected [showBytes b]
-  {-# INLINE bytes #-}
+  chunk k = Reporter $ \env st@State{_stOff,_stCol} ok err ->
+    let n = chunkWidth @k k
+    in if n + _stOff <= _envEnd env &&
+          chunkEqual @k (_envBuf env) _stOff k then
+         ok k st { _stOff = _stOff + n, _stCol = _stCol + n }
+       else
+         raiseError env st err $ EExpected [showChunk @k k]
+  {-# INLINE chunk #-}
 
-  asBytes p = do
+  asChunk p = do
     begin <- get (const _stOff)
     p
     end <- get (const _stOff)
-    src <- get (\env _ -> _envSrc env)
-    pure $ B.PS src begin (end - begin)
-  {-# INLINE asBytes #-}
+    src <- get (\env _ -> _envBuf env)
+    pure $ packChunk src begin (end - begin)
+  {-# INLINE asChunk #-}
 
+instance CharChunk k => CharParser k (Reporter k) where
   satisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let (c, w) = utf8Decode (_envSrc env) _stOff
+    let (c, w) = charAt @k (_envBuf env) _stOff
     in if | c /= '\0' ->
             if f c then
               ok c st
-              { _stOff =_stOff + w
+              { _stOff = _stOff + w
               , _stLine = if c == '\n' then _stLine + 1 else _stLine
               , _stCol = if c == '\n' then 1 else _stCol + 1
               }
@@ -232,12 +224,14 @@ instance MonadParser Reporter where
           | otherwise -> raiseError env st err EInvalidUtf8
   {-# INLINE satisfy #-}
 
+  -- By inling this combinator, GHC should figure out the `charWidth`
+  -- of the character resulting in an optimized decoder.
   char c =
-    let w = utf8Width c
+    let w = charWidth @k c
     in Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if utf8DecodeFixed w (_envSrc env) _stOff == c then
+      if charAtFixed @k w (_envBuf env) _stOff == c then
         ok c st
-        { _stOff =_stOff + w
+        { _stOff = _stOff + w
         , _stLine = if c == '\n' then _stLine + 1 else _stLine
         , _stCol = if c == '\n' then 1 else _stCol + 1
         }
@@ -245,22 +239,46 @@ instance MonadParser Reporter where
         raiseError env st err $ EExpected [show c]
   {-# INLINE char #-}
 
-raiseError :: Env -> State -> (State -> b) -> Error -> b
+  asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    let b = byteAt @k (_envBuf env) _stOff
+        b' = fromIntegral b
+    in if | b < 128, f b' ->
+              ok b' st
+              { _stOff = _stOff + 1
+              , _stLine = if b' == asc_newline then _stLine + 1 else _stLine
+              , _stCol = if b' == asc_newline then 1 else _stCol + 1
+              }
+          | _stOff >= _envEnd env -> err st
+          | otherwise -> raiseError env st err $ EUnexpected $ showByte b'
+  {-# INLINE asciiSatisfy #-}
+
+  asciiByte b = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+      if byteAt @k (_envBuf env) _stOff == fromIntegral b then
+        ok b st
+        { _stOff = _stOff + 1
+        , _stLine = if b == asc_newline then _stLine + 1 else _stLine
+        , _stCol = if b == asc_newline then 1 else _stCol + 1
+        }
+      else
+        raiseError env st err $ EExpected [showByte b]
+  {-# INLINE asciiByte #-}
+
+raiseError :: Env k -> State -> (State -> b) -> Error -> b
 raiseError env st err e = err $ addError env st e
 {-# INLINE raiseError #-}
 
 -- | Reader monad, modify environment locally
-local :: (State -> Env -> Env) -> Reporter a -> Reporter a
+local :: (State -> Env k -> Env k) -> Reporter k a -> Reporter k a
 local f p = Reporter $ \env st ok err ->
   unReporter p (f st env) st ok err
 {-# INLINE local #-}
 
 -- | Reader monad, get something from the environment
-get :: (Env -> State -> a) -> Reporter a
+get :: (Env k -> State -> a) -> Reporter k a
 get f = Reporter $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
-addLabel :: String -> Env -> Env
+addLabel :: String -> Env k -> Env k
 addLabel l env = case _envContext env of
   (l':_) | l == l' -> env
   ls               -> env { _envContext = take (_optMaxLabelsPerContext._envOptions $ env) $ l : ls }
@@ -270,7 +288,7 @@ addLabel l env = case _envContext env of
 -- which are kept in the parser state.
 -- Errors of lower priority and at an earlier position.
 -- Furthermore the error is merged with existing errors if possible.
-addError :: Env -> State -> Error -> State
+addError :: Env k -> State -> Error -> State
 addError env st e
   | _stOff st > _stErrOff st || _envCommit env > _stErrCommit st,
     Just e' <- mkError env e =
@@ -286,7 +304,7 @@ addError env st e
   | otherwise = st
 {-# INLINE addError #-}
 
-mkError :: Env -> Error -> Maybe ErrorContext
+mkError :: Env k -> Error -> Maybe ErrorContext
 mkError env e
   | _envHidden env, (l:ls) <- _envContext env = Just $ ([EExpected [l]], ls)
   | _envHidden env = Nothing
@@ -294,7 +312,7 @@ mkError env e
 {-# INLINE mkError #-}
 
 -- | Merge errors of two states, used when backtracking
-mergeStateErrors :: Env -> State -> State -> State
+mergeStateErrors :: Env k -> State -> State -> State
 mergeStateErrors env s s'
   | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
       s { _stErrors    = _stErrors s'
@@ -311,12 +329,12 @@ mergeStateErrors env s s'
 groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
 
-shrinkErrors :: Env -> [ErrorContext] -> [ErrorContext]
+shrinkErrors :: Env k -> [ErrorContext] -> [ErrorContext]
 shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn snd . sortOn snd
 
 -- | Shrink error context by deleting duplicates
 -- and merging errors if possible.
-mergeErrorContexts :: Env -> NonEmpty ErrorContext -> ErrorContext
+mergeErrorContexts :: Env k -> NonEmpty ErrorContext -> ErrorContext
 mergeErrorContexts env es@((_, ctx):| _) = (take (_optMaxErrorsPerContext._envOptions $ env) $ nubSort $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
 
 mergeEExpected :: [Error] -> [Error]
@@ -330,33 +348,6 @@ asEExpected :: Error -> [String]
 asEExpected (EExpected s) = s
 asEExpected _ = []
 
--- | Run 'Reporter' with additional 'ReportOptions'.
-runReporterWithOptions :: ReportOptions -> Reporter a -> FilePath -> ByteString -> Either Report a
-runReporterWithOptions o p f t =
-  let b = t <> "\0\0\0"
-  in unReporter p (initialEnv o f b) (initialState b) (\x _ -> Right x) (Left . getReport f)
-
--- | Run 'Reporter' on the given 'ByteString', returning either
--- an error 'Report' or, if successful, the result.
-runReporter :: Reporter a -> FilePath -> ByteString -> Either Report a
-runReporter = runReporterWithOptions defaultReportOptions
-
-getReport :: FilePath -> State -> Report
-getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stErrors s)
-
-initialEnv :: ReportOptions -> FilePath -> ByteString -> Env
-initialEnv _envOptions _envFile (B.PS _envSrc off len) = Env
-  { _envFile
-  , _envSrc
-  , _envOptions
-  , _envEnd     = off + len - 3
-  , _envContext = []
-  , _envHidden  = False
-  , _envCommit  = 0
-  , _envRefLine = 0
-  , _envRefCol  = 0
-  }
-
 defaultReportOptions :: ReportOptions
 defaultReportOptions = ReportOptions
   { _optMaxContexts         = 20
@@ -364,8 +355,35 @@ defaultReportOptions = ReportOptions
   , _optMaxLabelsPerContext = 5
   }
 
-initialState :: ByteString -> State
-initialState (B.PS _ _stOff _) = State
+-- | Run 'Reporter' with additional 'ReportOptions'.
+runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> Either Report a
+runReporterWithOptions o p f k =
+  let (b, off, len) = unpackChunk k
+  in unReporter p (initialEnv o f b (off + len)) (initialState off) (\x _ -> Right x) (Left . getReport f)
+
+-- | Run 'Reporter' on the given 'ByteString', returning either
+-- an error 'Report' or, if successful, the result.
+runReporter :: Chunk k => Reporter k a -> FilePath -> k -> Either Report a
+runReporter = runReporterWithOptions defaultReportOptions
+
+getReport :: FilePath -> State -> Report
+getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stErrors s)
+
+initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int -> Env k
+initialEnv _envOptions _envFile _envBuf _envEnd = Env
+  { _envFile
+  , _envBuf
+  , _envOptions
+  , _envEnd
+  , _envContext = []
+  , _envHidden  = False
+  , _envCommit  = 0
+  , _envRefLine = 0
+  , _envRefCol  = 0
+  }
+
+initialState :: Int -> State
+initialState _stOff = State
   { _stOff
   , _stLine      = 1
   , _stCol       = 1
@@ -375,6 +393,11 @@ initialState (B.PS _ _stOff _) = State
   , _stErrCommit = 0
   , _stErrors    = []
   }
+
+-- | Run 'Tracer' on the given 'ByteString', returning either
+-- an error 'Report' or, if successful, the result.
+runTracer :: Chunk k => Tracer k a -> FilePath -> k -> Either Report a
+runTracer = runReporter . unTracer
 
 -- | Pretty string representation of 'Report'.
 showReport :: Report -> String
@@ -397,10 +420,13 @@ showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
 
 -- | Parser which prints trace messages, when backtracking occurs.
-newtype Tracer a = Tracer { unTracer :: Reporter a }
-  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail, MonadParser)
+newtype Tracer k a = Tracer { unTracer :: Reporter k a }
+  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
 
-instance Alternative Tracer where
+deriving instance CharChunk k => ChunkParser k (Tracer k)
+deriving instance CharChunk k => CharParser k (Tracer k)
+
+instance Chunk k => Alternative (Tracer k) where
   empty = Tracer empty
 
   p1 <|> p2 = Tracer $ Reporter $ \env st ok err ->
@@ -410,12 +436,7 @@ instance Alternative Tracer where
           in if width > 1 then
                trace ("Back tracking " <> show width <> " bytes at line " <> show (_stLine s)
                        <> ", column " <> show (_stCol s) <> ", context " <> show (_envContext env) <> ": "
-                       <> showBytes (B.PS (_envSrc env) (_stOff st) width)) next
+                       <> showChunk (packChunk @k (_envBuf env) (_stOff st) width)) next
              else
                next
     in unReporter (unTracer p1) env st ok err'
-
--- | Run 'Tracer' on the given 'ByteString', returning either
--- an error 'Report' or, if successful, the result.
-runTracer :: Tracer a -> FilePath -> ByteString -> Either Report a
-runTracer = runReporter . unTracer

@@ -17,11 +17,18 @@ tested-with:
 default-extensions:
 - BangPatterns
 - DeriveGeneric
+- FlexibleContexts
+- FlexibleInstances
+- FunctionalDependencies
 - GeneralizedNewtypeDeriving
 - MultiWayIf
 - NamedFieldPuns
 - OverloadedStrings
 - Rank2Types
+- ScopedTypeVariables
+- StandaloneDeriving
+- TypeApplications
+- TypeFamilies
 
 ghc-options:
 - -Wall

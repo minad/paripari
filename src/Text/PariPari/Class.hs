@@ -1,28 +1,23 @@
 module Text.PariPari.Class (
-  MonadParser(..)
-  , Parser
+  ChunkParser(..)
+  , Chunk(Element, showElement, showChunk)
+  , CharChunk
+  , CharParser(..)
   , Alternative(..)
   , MonadPlus
+  , Word8
   , Pos(..)
   , Error(..)
-  , ByteString
-  , Word8
   , showError
 ) where
 
 import Control.Applicative (Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.Fail (MonadFail(..))
-import Data.ByteString (ByteString)
 import Data.List (intercalate)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-
--- | Line and column position starting at (1,1)
-data Pos = Pos
-  { _posLine   :: !Int
-  , _posColumn :: !Int
-  } deriving (Eq, Show, Generic)
+import Text.PariPari.Internal
 
 -- | Parsing errors
 data Error
@@ -38,13 +33,10 @@ data Error
   | ENotEnoughIndent  !Int !Int
   deriving (Eq, Ord, Show, Generic)
 
--- | Parser shortcut
-type Parser a = (forall p. MonadParser p => p a)
-
 -- | Parser class, which specifies the necessary
 -- primitives for parsing. All other parser combinators
 -- rely on these primitives.
-class (MonadFail p, MonadPlus p) => MonadParser p where
+class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- | Get file name associated with current parser
   getFile :: p FilePath
 
@@ -93,24 +85,31 @@ class (MonadFail p, MonadPlus p) => MonadParser p where
   -- of the parser.
   commit :: p a -> p a
 
-  -- | Parse a single byte
-  byte :: Word8 -> p Word8
+  -- | Parse a single element
+  element :: Element k -> p (Element k)
 
-  -- | Parse a single UTF-8 character
+  -- | Parse a single byte with the given predicate
+  elementSatisfy :: (Element k -> Bool) -> p (Element k)
+
+  -- | Parse a chunk of elements. The chunk must not
+  -- contain multiple lines, otherwise the position information
+  -- will be invalid.
+  chunk :: k -> p k
+
+  -- | Run the given parser and return the
+  -- result as buffer
+  asChunk :: p () -> p k
+
+class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
+  -- | Parse a single character
   char :: Char -> p Char
 
   -- | Parse a single character with the given predicate
   satisfy :: (Char -> Bool) -> p Char
 
-  -- | Parse a single byte with the given predicate
-  byteSatisfy :: (Word8 -> Bool) -> p Word8
+  asciiByte :: Word8 -> p Word8
 
-  -- | Parse a string of bytes
-  bytes :: ByteString -> p ByteString
-
-  -- | Run the given parser and return the
-  -- result as bytes
-  asBytes :: p () -> p ByteString
+  asciiSatisfy :: (Word8 -> Bool) -> p Word8
 
 -- | Pretty string representation of 'Error'
 showError :: Error -> String

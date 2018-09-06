@@ -7,14 +7,9 @@ out of the box with equivalent behaviour, in particular with respect to backtrac
 
 Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: MonadParser p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
-PariPari operates only on strict bytestrings, which can be treated purely as binary
-using `byte` and `byteSatisfy` combinators. If characters are parsed using the `char` and
-`satisfy` combinators, the bytestring is interpreted as UTF-8 and decoded on the fly.
-
-In contrast, other parser combinator libraries often allow different stream datatypes.
-Something like this is not supported since conversion to bytestrings is much cheaper
-than operating the parser on a suboptimal input format. However as a consequence, PariPari
-is only a good fit for data which is available at once (no streaming).
+PariPari operates on strict `ByteString` and `Text`. If characters are parsed using the `char` and
+`satisfy` combinators, bytestrings are interpreted as UTF-8 and decoded on the fly.
+As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
 In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
 ## Features
@@ -25,7 +20,7 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Backtracking by default for ease of use
 * `commit` combinator to improve error messages by commiting to branches
 * Tracing parser to analyze backtracking
-* Both byte and character parser combinators provided
+* ByteStrings can be parsed as UTF-8
 * Combinators for indentation-sensitive parsing
 * Most Parsec/Megaparsec combinators provided, relying on parser-combinators
 
@@ -56,11 +51,21 @@ import qualified Data.ByteString as B
 
 We define a datatype of JSON values.
 
+We parametrize the parser with the string type.
+Both `ByteString` and `Text` are supported.
+Note that even in the case of `ByteStrings` a `CharParser` instance
+is provided, which interprets the bytes as UTF-8.
+
+``` haskell
+type StringType = B.ByteString
+type Parser a = (forall p. CharParser StringType p => p a)
+```
+
 ``` haskell
 data Value
-  = Object ![(Text, Value)]
+  = Object ![(StringType, Value)]
   | Array  ![Value]
-  | String !Text
+  | String !StringType
   | Number !Integer !Integer
   | Bool   !Bool
   | Null
@@ -80,7 +85,7 @@ Objects consist of pairs of a text string and a value.
 object :: Parser Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser (Text, Value)
+pair :: Parser (StringType, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 ```
 
@@ -104,7 +109,7 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser Text
+text :: Parser StringType
 text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 ```
 
@@ -139,7 +144,7 @@ main = do
   case args of
     [file] -> do
       b <- B.readFile file
-      case runParser json file b of
+      case runCharParser json file b of
         Left x  -> do
           putStrLn $ showReport x
           print $ runTracer json file b

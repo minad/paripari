@@ -3,10 +3,13 @@ import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
 
+type StringType = B.ByteString
+type Parser a = (forall p. CharParser StringType p => p a)
+
 data Value
-  = Object ![(Text, Value)]
+  = Object ![(StringType, Value)]
   | Array  ![Value]
-  | String !Text
+  | String !StringType
   | Number !Integer !Integer
   | Bool   !Bool
   | Null
@@ -18,7 +21,7 @@ json = space *> (object <|> array) <?> "json"
 object :: Parser Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser (Text, Value)
+pair :: Parser (StringType, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 
 array :: Parser Value
@@ -34,7 +37,7 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser Text
+text :: Parser StringType
 text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 
 number :: Parser Value
@@ -52,7 +55,7 @@ main = do
   case args of
     [file] -> do
       b <- B.readFile file
-      case runParser json file b of
+      case runCharParser json file b of
         Left x  -> do
           putStrLn $ showReport x
           print $ runTracer json file b

@@ -45,8 +45,8 @@ module Text.PariPari.Combinators (
   , indented
   , line
   , linefold
-  , notByte
-  , anyByte
+  , notElement
+  , anyElement
   , digitByte
   , asciiByte
   , integer
@@ -71,28 +71,26 @@ module Text.PariPari.Combinators (
   , punctuationChar
   , spaceChar
   , asciiChar
-  , string
-  , string'
-  , asString
-  , takeBytes
   , skipChars
-  , skipBytes
   , takeChars
   , skipCharsWhile
   , takeCharsWhile
-  , skipBytesWhile
-  , takeBytesWhile
-  , skipBytesWhile1
-  , takeBytesWhile1
   , skipCharsWhile1
   , takeCharsWhile1
+  , takeElements
+  , skipElements
+  , skipElementsWhile
+  , takeElementsWhile
+  , skipElementsWhile1
+  , takeElementsWhile1
+  , string
 ) where
 
 import Control.Applicative ((<|>), empty, optional)
 import Control.Monad (when)
 import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.List.NonEmpty (NonEmpty(..))
-import Text.PariPari.Ascii
+import Text.PariPari.Internal
 import Text.PariPari.Class
 import Data.Text (Text)
 import Data.Functor (void)
@@ -100,38 +98,38 @@ import Prelude hiding (getLine)
 import qualified Control.Monad.Combinators as O
 import qualified Control.Monad.Combinators.NonEmpty as ON
 import qualified Data.Char as C
-import qualified Data.Text.Encoding as T
-import qualified Data.Text as T
 
-infix 0 <?>
+type ChunkP k a = (forall p. ChunkParser k p => p a)
+type CharP k a  = (forall p. CharParser k p => p a)
 
 -- | Infix alias for 'label'
-(<?>) :: MonadParser p => p a -> String -> p a
+(<?>) :: ChunkParser k p => p a -> String -> p a
 (<?>) = flip label
 {-# INLINE (<?>) #-}
+infix 0 <?>
 
 -- | Get line number of the reference position
-getRefLine :: Parser Int
+getRefLine :: ChunkP k Int
 getRefLine = _posLine <$> getRefPos
 {-# INLINE getRefLine #-}
 
 -- | Get column number of the reference position
-getRefColumn :: Parser Int
+getRefColumn :: ChunkP k Int
 getRefColumn = _posColumn <$> getRefPos
 {-# INLINE getRefColumn #-}
 
 -- | Get current line number
-getLine :: Parser Int
+getLine :: ChunkP k Int
 getLine = _posLine <$> getPos
 {-# INLINE getLine #-}
 
 -- | Get current column
-getColumn :: Parser Int
+getColumn :: ChunkP k Int
 getColumn = _posColumn <$> getPos
 {-# INLINE getColumn #-}
 
 -- | Decorate the parser result with the current position
-withPos :: MonadParser p => p a -> p (Pos, a)
+withPos :: ChunkParser k p => p a -> p (Pos, a)
 withPos p = do
   pos <- getPos
   ret <- p
@@ -141,7 +139,7 @@ withPos p = do
 type Span = (Pos, Pos)
 
 -- | Decoreate the parser result with the position span
-withSpan :: MonadParser p => p a -> p (Span, a)
+withSpan :: ChunkParser k p => p a -> p (Span, a)
 withSpan p = do
   begin <- getPos
   ret <- p
@@ -150,7 +148,7 @@ withSpan p = do
 {-# INLINE withSpan #-}
 
 -- | Parser succeeds on the same line as the reference line
-line :: Parser ()
+line :: ChunkP k ()
 line = do
   l <- getLine
   rl <- getRefLine
@@ -158,7 +156,7 @@ line = do
 {-# INLINE line #-}
 
 -- | Parser succeeds on the same column as the reference column
-align :: Parser ()
+align :: ChunkP k ()
 align = do
   c <- getColumn
   rc <- getRefColumn
@@ -166,7 +164,7 @@ align = do
 {-# INLINE align #-}
 
 -- | Parser succeeds for columns greater than the current reference column
-indented :: Parser ()
+indented :: ChunkP k ()
 indented = do
   c <- getColumn
   rc <- getRefColumn
@@ -175,36 +173,53 @@ indented = do
 
 -- | Parser succeeds either on the reference line or
 -- for columns greater than the current reference column
-linefold :: Parser ()
+linefold :: ChunkP k ()
 linefold = line <|> indented
 {-# INLINE linefold #-}
 
 -- | Parser a single byte different from the given one
-notByte :: Word8 -> Parser Word8
-notByte b = byteSatisfy (/= b) <?> "not " <> showByte b
-{-# INLINE notByte #-}
+notElement :: forall k. Element k -> ChunkP k (Element k)
+notElement e = elementSatisfy @k (/= e) <?> "not " <> showElement @k e
+{-# INLINE notElement #-}
 
 -- | Parse an arbitrary byte
-anyByte :: Parser Word8
-anyByte = byteSatisfy (const True)
-{-# INLINE anyByte #-}
-
--- | Parse a byte of the ASCII charset (< 128)
-asciiByte :: Parser Word8
-asciiByte = byteSatisfy (< 128)
-{-# INLINE asciiByte #-}
+anyElement :: ChunkP k (Element k)
+anyElement = elementSatisfy (const True)
+{-# INLINE anyElement #-}
 
 -- | Parse a digit byte for the given base.
 -- Bases 2 to 36 are supported.
-digitByte :: Int -> Parser Word8
-digitByte base = byteSatisfy (isDigit base)
+digitByte :: Int -> CharP k Word8
+digitByte base = asciiSatisfy (isDigit base)
 {-# INLINE digitByte #-}
+
+isDigit :: Int -> Word8 -> Bool
+isDigit base b
+  | base >= 2 && base <= 10 = b >= asc_0 && b <= asc_0 + fromIntegral base - 1
+  | base <= 36 = (b >= asc_0 && b <= asc_9)
+                 || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
+                 || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
+  |otherwise = error "Text.PariPari.Combinators.isDigit: Bases 2 to 36 are supported"
+{-# INLINE isDigit #-}
+
+digitToInt :: Int -> Word8 -> Word
+digitToInt base b
+  | n <- (fromIntegral b :: Word) - fromIntegral asc_0, base <= 10 || n <= 9  = n
+  | n <- (fromIntegral b :: Word) - fromIntegral asc_A, n               <= 26 = n + 10
+  | n <- (fromIntegral b :: Word) - fromIntegral asc_a                        = n + 10
+{-# INLINE digitToInt #-}
+
+-- | Parse a single digit of the given base and return its value.
+-- Bases 2 to 36 are supported.
+digit :: Int -> CharP k Word
+digit base = digitToInt base <$> asciiSatisfy (isDigit base)
+{-# INLINE digit #-}
 
 -- | Parse an integer of the given base.
 -- Returns the integer and the number of digits.
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
-integer' :: (Num a, MonadParser p) => p sep -> Int -> p (a, Int)
+integer' :: (Num a, CharParser k p) => p sep -> Int -> p (a, Int)
 integer' sep base = label (integerLabel base) $ do
   d <- digit base
   accum 1 $ fromIntegral d
@@ -218,7 +233,7 @@ integer' sep base = label (integerLabel base) $ do
 -- | Parse an integer of the given base.
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
-integer :: (Num a, MonadParser p) => p sep -> Int -> p a
+integer :: (Num a, CharParser k p) => p sep -> Int -> p a
 integer sep base = label (integerLabel base) $ do
   d <- digit base
   accum $ fromIntegral d
@@ -236,52 +251,30 @@ integerLabel 10 = "decimal integer"
 integerLabel 16 = "hexadecimal integer"
 integerLabel b  = "integer of base " <> show b
 
-decimal :: Num a => Parser a
+decimal :: Num a => CharP k a
 decimal = integer (pure ()) 10
 {-# INLINE decimal #-}
 
-octal :: Num a => Parser a
+octal :: Num a => CharP k a
 octal = integer (pure ()) 8
 {-# INLINE octal #-}
 
-hexadecimal :: Num a => Parser a
+hexadecimal :: Num a => CharP k a
 hexadecimal = integer (pure ()) 16
 {-# INLINE hexadecimal #-}
 
-digitToInt :: Int -> Word8 -> Word
-digitToInt base b
-  | n <- (fromIntegral b :: Word) - fromIntegral asc_0, base <= 10 || n <= 9  = n
-  | n <- (fromIntegral b :: Word) - fromIntegral asc_A, n               <= 26 = n + 10
-  | n <- (fromIntegral b :: Word) - fromIntegral asc_a                        = n + 10
-{-# INLINE digitToInt #-}
-
--- | Parse a single digit of the given base and return its value.
--- Bases 2 to 36 are supported.
-digit :: Int -> Parser Word
-digit base = digitToInt base <$> byteSatisfy (isDigit base)
-{-# INLINE digit #-}
-
-isDigit :: Int -> Word8 -> Bool
-isDigit base b
-  | base >= 2 && base <= 10 = b >= asc_0 && b <= asc_0 + fromIntegral base - 1
-  | base <= 36 = (b >= asc_0 && b <= asc_9)
-                 || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
-                 || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
-  |otherwise = error "Text.PariPari.Combinators.isDigit: Bases 2 to 36 are supported"
-{-# INLINE isDigit #-}
-
 -- | Parse a number with a plus or minus sign.
-signed :: (Num a, MonadParser p) => p a -> p a
-signed p = ($) <$> ((id <$ byte asc_plus) <|> (negate <$ byte asc_minus) <|> pure id) <*> p
+signed :: (Num a, CharParser k p) => p a -> p a
+signed p = ($) <$> ((id <$ asciiByte asc_plus) <|> (negate <$ asciiByte asc_minus) <|> pure id) <*> p
 {-# INLINE signed #-}
 
 -- | Parse a fraction of arbitrary exponent base and coefficient base.
 -- 'fractionDec' and 'fractionHex' should be used instead probably.
-fraction :: (Num a, MonadParser p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
+fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
   coeff <- integer digitSep coeffBase
-  void $ optional $ byte asc_point
+  void $ optional $ asciiByte asc_point
   (frac, fracLen) <- option (0, 0) $ integer' digitSep coeffBase
   expVal <- option 0 $ expSep *> signed (integer digitSep 10)
   pure (coeff * fromIntegral coeffBase ^ fracLen + frac,
@@ -292,19 +285,19 @@ fraction expSep expBase coeffBasePow digitSep = do
 -- | Parse a decimal fraction, returning (coefficient, 10, exponent),
 -- corresponding to coefficient * 10^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
-fractionDec :: (Num a, MonadParser p) => p digitSep -> p (a, Int, a)
-fractionDec sep = fraction (byteSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
+fractionDec :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
+fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
 
 -- | Parse a hexadecimal fraction, returning (coefficient, 2, exponent),
 -- corresponding to coefficient * 2^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
-fractionHex :: (Num a, MonadParser p) => p digitSep -> p (a, Int, a)
-fractionHex sep = fraction (byteSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
+fractionHex :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
+fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
 
 -- | Parse a case-insensitive character
-char' :: Char -> Parser Char
+char' :: Char -> CharP k Char
 char' x =
   let l = C.toLower x
       u = C.toUpper x
@@ -312,142 +305,65 @@ char' x =
 {-# INLINE char' #-}
 
 -- | Parse a character different from the given one.
-notChar :: Char -> Parser Char
+notChar :: Char -> CharP k Char
 notChar c = satisfy (/= c)
 {-# INLINE notChar #-}
 
 -- | Parse an arbitrary character.
-anyChar :: Parser Char
+anyChar :: CharP k Char
 anyChar = satisfy (const True)
 {-# INLINE anyChar #-}
 
 -- | Parse an alphanumeric character, including Unicode.
-alphaNumChar :: Parser Char
+alphaNumChar :: CharP k Char
 alphaNumChar = satisfy C.isAlphaNum <?> "alphanumeric character"
 {-# INLINE alphaNumChar #-}
 
 -- | Parse a letter character, including Unicode.
-letterChar :: Parser Char
+letterChar :: CharP k Char
 letterChar = satisfy C.isLetter <?> "letter"
 {-# INLINE letterChar #-}
 
 -- | Parse a lowercase letter, including Unicode.
-lowerChar :: Parser Char
+lowerChar :: CharP k Char
 lowerChar = satisfy C.isLower <?> "lowercase letter"
 {-# INLINE lowerChar #-}
 
 -- | Parse a uppercase letter, including Unicode.
-upperChar :: Parser Char
+upperChar :: CharP k Char
 upperChar = satisfy C.isUpper <?> "uppercase letter"
 {-# INLINE upperChar #-}
 
 -- | Parse a space character, including Unicode.
-spaceChar :: Parser Char
+spaceChar :: CharP k Char
 spaceChar = satisfy C.isSpace <?> "space"
 {-# INLINE spaceChar #-}
 
 -- | Parse a symbol character, including Unicode.
-symbolChar :: Parser Char
+symbolChar :: CharP k Char
 symbolChar = satisfy C.isSymbol <?> "symbol"
 {-# INLINE symbolChar #-}
 
 -- | Parse a punctuation character, including Unicode.
-punctuationChar :: Parser Char
+punctuationChar :: CharP k Char
 punctuationChar = satisfy C.isPunctuation <?> "punctuation"
 {-# INLINE punctuationChar #-}
 
 -- | Parse a digit character of the given base.
 -- Bases 2 to 36 are supported.
-digitChar :: Int -> Parser Char
+digitChar :: Int -> CharP k Char
 digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
 
 -- | Parse a character beloning to the ASCII charset (< 128)
-asciiChar :: Int -> Parser Char
-asciiChar base = unsafeAsciiToChar <$> digitByte base
+asciiChar :: CharP k Char
+asciiChar = unsafeAsciiToChar <$> asciiSatisfy (const True)
 {-# INLINE asciiChar #-}
 
 -- | Parse a character belonging to the given Unicode category
-categoryChar :: C.GeneralCategory -> Parser Char
+categoryChar :: C.GeneralCategory -> CharP k Char
 categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
 {-# INLINE categoryChar #-}
-
--- | Parse a text string
-string :: Text -> Parser Text
-string t = t <$ bytes (T.encodeUtf8 t)
-{-# INLINE string #-}
-
-string' :: Text -> Parser Text
-string' s = asString (go s) <?> "case-insensitive \"" <> T.unpack (T.toLower s) <> "\""
-  where go t
-          | T.null t  = pure ()
-          | otherwise = char' (T.head t) *> go (T.tail t)
-{-# INLINE string' #-}
-
--- | Run the given parser but return the result as a 'Text' string
-asString :: MonadParser p => p () -> p Text
-asString p = T.decodeUtf8 <$> asBytes p
-{-# INLINE asString #-}
-
--- | Take the next n bytes and advance the position by n bytes
-takeBytes :: Int -> Parser ByteString
-takeBytes n = asBytes (skipBytes n) <?> show n <> " bytes"
-{-# INLINE takeBytes #-}
-
--- | Skip the next n bytes
-skipBytes :: Int -> Parser ()
-skipBytes n = skipCount n anyByte
-{-# INLINE skipBytes #-}
-
--- | Skip the next n characters
-skipChars :: Int -> Parser ()
-skipChars n = skipCount n anyChar
-{-# INLINE skipChars #-}
-
--- | Take the next n characters and advance the position by n characters
-takeChars :: Int -> Parser Text
-takeChars n = asString (skipChars n) <?> "string of length " <> show n
-{-# INLINE takeChars #-}
-
--- | Skip char while predicate is true
-skipCharsWhile :: (Char -> Bool) -> Parser ()
-skipCharsWhile f = skipMany (satisfy f)
-{-# INLINE skipCharsWhile #-}
-
--- | Take chars while predicate is true
-takeCharsWhile :: (Char -> Bool) -> Parser Text
-takeCharsWhile f = asString (skipCharsWhile f)
-{-# INLINE takeCharsWhile #-}
-
--- | Skip bytes while predicate is true
-skipBytesWhile :: (Word8 -> Bool) -> Parser ()
-skipBytesWhile f = skipMany (byteSatisfy f)
-{-# INLINE skipBytesWhile #-}
-
--- | Takes bytes while predicate is true
-takeBytesWhile :: (Word8 -> Bool) -> Parser ByteString
-takeBytesWhile f = asBytes (skipBytesWhile f)
-{-# INLINE takeBytesWhile #-}
-
--- | Skip at least one byte while predicate is true
-skipBytesWhile1 :: (Word8 -> Bool) -> Parser ()
-skipBytesWhile1 f = byteSatisfy f *> skipBytesWhile f
-{-# INLINE skipBytesWhile1 #-}
-
--- | Take at least one byte while predicate is true
-takeBytesWhile1 :: (Word8 -> Bool) -> Parser ByteString
-takeBytesWhile1 f = asBytes (skipBytesWhile1 f)
-{-# INLINE takeBytesWhile1 #-}
-
--- | Skip at least one byte while predicate is true
-skipCharsWhile1 :: (Char -> Bool) -> Parser ()
-skipCharsWhile1 f = satisfy f *> skipCharsWhile f
-{-# INLINE skipCharsWhile1 #-}
-
--- | Take at least one byte while predicate is true
-takeCharsWhile1 :: (Char -> Bool) -> Parser Text
-takeCharsWhile1 f = asString (skipCharsWhile1 f)
-{-# INLINE takeCharsWhile1 #-}
 
 untitle :: String -> String
 untitle []     = []
@@ -455,3 +371,68 @@ untitle (x:xs) = C.toLower x : go xs
   where go [] = ""
         go (y:ys) | C.isUpper y = ' ' : C.toLower y : untitle ys
                   | otherwise   = y : ys
+
+-- | Skip the next n elements
+skipElements :: Int -> ChunkP k ()
+skipElements n = skipCount n anyElement
+{-# INLINE skipElements #-}
+
+-- | Take the next n elements and advance the position by n
+takeElements :: Int -> ChunkP k k
+takeElements n = asChunk (skipElements n) <?> show n <> " elements"
+{-# INLINE takeElements #-}
+
+-- | Skip elements while predicate is true
+skipElementsWhile :: (Element k -> Bool) -> ChunkP k ()
+skipElementsWhile f = skipMany (elementSatisfy f)
+{-# INLINE skipElementsWhile #-}
+
+-- | Takes elements while predicate is true
+takeElementsWhile :: (Element k -> Bool) -> ChunkP k k
+takeElementsWhile f = asChunk (skipElementsWhile f)
+{-# INLINE takeElementsWhile #-}
+
+-- | Skip at least one element while predicate is true
+skipElementsWhile1 :: (Element k -> Bool) -> ChunkP k ()
+skipElementsWhile1 f = elementSatisfy f *> skipElementsWhile f
+{-# INLINE skipElementsWhile1 #-}
+
+-- | Take at least one element while predicate is true
+takeElementsWhile1 :: (Element k -> Bool) -> ChunkP k k
+takeElementsWhile1 f = asChunk (skipElementsWhile1 f)
+{-# INLINE takeElementsWhile1 #-}
+
+-- | Skip the next n characters
+skipChars :: Int -> CharP k ()
+skipChars n = skipCount n anyChar
+{-# INLINE skipChars #-}
+
+-- | Skip char while predicate is true
+skipCharsWhile :: (Char -> Bool) -> CharP k ()
+skipCharsWhile f = skipMany (satisfy f)
+{-# INLINE skipCharsWhile #-}
+
+-- | Skip at least one char while predicate is true
+skipCharsWhile1 :: (Char -> Bool) -> CharP k ()
+skipCharsWhile1 f = satisfy f *> skipCharsWhile f
+{-# INLINE skipCharsWhile1 #-}
+
+-- | Take the next n characters and advance the position by n characters
+takeChars :: Int -> CharP k k
+takeChars n = asChunk (skipChars n) <?> "string of length " <> show n
+{-# INLINE takeChars #-}
+
+-- | Take chars while predicate is true
+takeCharsWhile :: (Char -> Bool) -> CharP k k
+takeCharsWhile f = asChunk (skipCharsWhile f)
+{-# INLINE takeCharsWhile #-}
+
+-- | Take at least one byte while predicate is true
+takeCharsWhile1 :: (Char -> Bool) -> CharP k k
+takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
+{-# INLINE takeCharsWhile1 #-}
+
+-- | Parse a string
+string :: Text -> CharP k Text
+string t = t <$ chunk (textToChunk t)
+{-# INLINE string #-}

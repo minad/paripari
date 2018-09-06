@@ -4,15 +4,12 @@ module Text.PariPari.Acceptor (
 ) where
 
 import Control.Monad (void)
-import Text.PariPari.Ascii
 import Text.PariPari.Class
-import Text.PariPari.Decode
-import Foreign.ForeignPtr (ForeignPtr)
+import Text.PariPari.Internal
 import qualified Control.Monad.Fail as Fail
-import qualified Data.ByteString.Internal as B
 
-data Env = Env
-  { _envSrc     :: !(ForeignPtr Word8)
+data Env k = Env
+  { _envBuf     :: !(Buffer k)
   , _envEnd     :: !Int
   , _envFile    :: !FilePath
   , _envRefLine :: !Int
@@ -27,27 +24,27 @@ data State = State
 
 -- | Parser which is optimized for fast parsing. Error reporting
 -- is minimal.
-newtype Acceptor a = Acceptor
-  { unAcceptor :: forall b. Env -> State
+newtype Acceptor k a = Acceptor
+  { unAcceptor :: forall b. Env k -> State
                -> (a     -> State -> b)
                -> (Error -> b)
                -> b
   }
 
-instance Semigroup a => Semigroup (Acceptor a) where
+instance (Chunk k, Semigroup a) => Semigroup (Acceptor k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
   {-# INLINE (<>) #-}
 
-instance Monoid a => Monoid (Acceptor a) where
+instance (Chunk k, Monoid a) => Monoid (Acceptor k a) where
   mempty = pure mempty
   {-# INLINE mempty #-}
 
-instance Functor Acceptor where
+instance Functor (Acceptor k) where
   fmap f p = Acceptor $ \env st ok err ->
     unAcceptor p env st (ok . f) err
   {-# INLINE fmap #-}
 
-instance Applicative Acceptor where
+instance Chunk k => Applicative (Acceptor k) where
   pure x = Acceptor $ \_ st ok _ -> ok x st
   {-# INLINE pure #-}
 
@@ -69,7 +66,7 @@ instance Applicative Acceptor where
     pure x
   {-# INLINE (<*) #-}
 
-instance Alternative Acceptor where
+instance Chunk k => Alternative (Acceptor k) where
   empty = Acceptor $ \_ _ _ err -> err EEmpty
   {-# INLINE empty #-}
 
@@ -78,9 +75,9 @@ instance Alternative Acceptor where
     in unAcceptor p1 env st ok err'
   {-# INLINE (<|>) #-}
 
-instance MonadPlus Acceptor
+instance Chunk k => MonadPlus (Acceptor k)
 
-instance Monad Acceptor where
+instance Chunk k => Monad (Acceptor k) where
   p >>= f = Acceptor $ \env st ok err ->
     let ok' x s = unAcceptor (f x) env s ok err
     in unAcceptor p env st ok' err
@@ -89,11 +86,11 @@ instance Monad Acceptor where
   fail msg = Fail.fail msg
   {-# INLINE fail #-}
 
-instance Fail.MonadFail Acceptor where
+instance Chunk k => Fail.MonadFail (Acceptor k) where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance MonadParser Acceptor where
+instance Chunk k => ChunkParser k (Acceptor k) where
   getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 
@@ -136,53 +133,48 @@ instance MonadParser Acceptor where
   commit p = p
   {-# INLINE commit #-}
 
-  byte b = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  element e = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff >= _envEnd env -> err EEmpty
-       | b == byteAt (_envSrc env) _stOff ->
-           ok b st
-           { _stOff =_stOff + 1
-           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-           , _stCol = if b == asc_newline then 1 else _stCol + 1
-           }
+       | (e', w) <- elementAt @k (_envBuf env) _stOff, e == e',
+         pos <- elementPos @k e (Pos _stLine _stCol) ->
+           ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
        | otherwise ->
-           err $ ECombinator "byte"
-  {-# INLINE byte #-}
+           err $ ECombinator "element"
+  {-# INLINE element #-}
 
-  byteSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let b = byteAt (_envSrc env) _stOff
+  elementSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    let (e, w) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env -> err EEmpty
-          | f b ->
-              ok b st
-              { _stOff =_stOff + 1
-              , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b == asc_newline then 1 else _stCol + 1
-              }
+          | f e, pos <- elementPos @k e (Pos _stLine _stCol) ->
+              ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
           | otherwise ->
-              err $ ECombinator "byteSatisfy"
-  {-# INLINE byteSatisfy #-}
+              err $ ECombinator "elementSatisfy"
+  {-# INLINE elementSatisfy #-}
 
-  bytes b@(B.PS p i n) = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
-    if n + _stOff <= _envEnd env &&
-       bytesEqual (_envSrc env) _stOff p i n then
-      ok b st { _stOff = _stOff + n, _stCol = _stCol + n }
-    else
-      err $ ECombinator "bytes"
-  {-# INLINE bytes #-}
+  chunk k = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
+    let n = chunkWidth @k k
+    in if n + _stOff <= _envEnd env &&
+          chunkEqual @k (_envBuf env) _stOff k then
+         ok k st { _stOff = _stOff + n, _stCol = _stCol + n }
+       else
+         err $ ECombinator "chunk"
+  {-# INLINE chunk #-}
 
-  asBytes p = do
+  asChunk p = do
     begin <- get (const _stOff)
     p
     end <- get (const _stOff)
-    src <- get (\env _ -> _envSrc env)
-    pure $ B.PS src begin (end - begin)
-  {-# INLINE asBytes #-}
+    src <- get (\env _ -> _envBuf env)
+    pure $ packChunk src begin (end - begin)
+  {-# INLINE asChunk #-}
 
+instance CharChunk k => CharParser k (Acceptor k) where
   satisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let (c, w) = utf8Decode (_envSrc env) _stOff
+    let (c, w) = charAt @k (_envBuf env) _stOff
     in if | c /= '\0' ->
             if f c then
               ok c st
-              { _stOff =_stOff + w
+              { _stOff = _stOff + w
               , _stLine = if c == '\n' then _stLine + 1 else _stLine
               , _stCol = if c == '\n' then 1 else _stCol + 1
               }
@@ -192,14 +184,14 @@ instance MonadParser Acceptor where
           | otherwise -> err $ ECombinator "satisfy"
   {-# INLINE satisfy #-}
 
-  -- By inling this combinator, GHC should figure out the `utf8Width`
+  -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimized decoder.
   char c =
-    let w = utf8Width c
+    let w = charWidth @k c
     in Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if utf8DecodeFixed w (_envSrc env) _stOff == c then
+      if charAtFixed @k w (_envBuf env) _stOff == c then
         ok c st
-        { _stOff =_stOff + w
+        { _stOff = _stOff + w
         , _stLine = if c == '\n' then _stLine + 1 else _stLine
         , _stCol = if c == '\n' then 1 else _stCol + 1
         }
@@ -207,35 +199,59 @@ instance MonadParser Acceptor where
         err $ ECombinator "char"
   {-# INLINE char #-}
 
+  asciiSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    let b = byteAt @k (_envBuf env) _stOff
+        b' = fromIntegral b
+    in if | b < 128, f b' ->
+              ok b' st
+              { _stOff = _stOff + 1
+              , _stLine = if b' == asc_newline then _stLine + 1 else _stLine
+              , _stCol = if b' == asc_newline then 1 else _stCol + 1
+              }
+          | _stOff >= _envEnd env -> err EEmpty
+          | otherwise -> err $ ECombinator "satisfy"
+  {-# INLINE asciiSatisfy #-}
+
+  asciiByte b = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+      if byteAt @k (_envBuf env) _stOff == fromIntegral b then
+        ok b st
+        { _stOff = _stOff + 1
+        , _stLine = if b == asc_newline then _stLine + 1 else _stLine
+        , _stCol = if b == asc_newline then 1 else _stCol + 1
+        }
+      else
+        err $ ECombinator "char"
+  {-# INLINE asciiByte #-}
+
 -- | Reader monad, get something from the environment
-get :: (Env -> State -> a) -> Acceptor a
+get :: (Env k -> State -> a) -> Acceptor k a
 get f = Acceptor $ \env st ok _ -> ok (f env st) st
 {-# INLINE get #-}
 
 -- | Reader monad, modify environment locally
-local :: (State -> Env -> Env) -> Acceptor a -> Acceptor a
+local :: (State -> Env k -> Env k) -> Acceptor k a -> Acceptor k a
 local f p = Acceptor $ \env st ok err ->
   unAcceptor p (f st env) st ok err
 {-# INLINE local #-}
 
--- | Run 'Acceptor' on the given 'ByteString', returning either
+-- | Run 'Acceptor' on the given chunk, returning either
 -- a simple 'Error' or, if successful, the result.
-runAcceptor :: Acceptor a -> FilePath -> ByteString -> Either Error a
-runAcceptor p f t =
-  let b = t <> "\0\0\0"
-  in unAcceptor p (initialEnv f b) (initialState b) (\x _ -> Right x) Left
+runAcceptor :: Chunk k => Acceptor k a -> FilePath -> k -> Either Error a
+runAcceptor p f k =
+  let (b, off, len) = unpackChunk k
+  in unAcceptor p (initialEnv f b (off + len)) (initialState off) (\x _ -> Right x) Left
 
-initialEnv :: FilePath -> ByteString -> Env
-initialEnv _envFile (B.PS _envSrc off len) = Env
-  { _envSrc
+initialEnv :: FilePath -> Buffer k -> Int -> Env k
+initialEnv _envFile _envBuf _envEnd = Env
+  { _envBuf
   , _envFile
-  , _envEnd = off + len - 3
+  , _envEnd
   , _envRefLine = 0
   , _envRefCol = 0
   }
 
-initialState :: ByteString -> State
-initialState (B.PS _ _stOff _) = State
+initialState :: Int -> State
+initialState _stOff = State
   { _stOff
   , _stLine = 1
   , _stCol = 1
