@@ -14,22 +14,6 @@ tested-with:
   GHC == 8.4.3,
   GHC == 8.6.1
 
-default-extensions:
-- BangPatterns
-- DeriveGeneric
-- FlexibleContexts
-- FlexibleInstances
-- FunctionalDependencies
-- GeneralizedNewtypeDeriving
-- MultiWayIf
-- NamedFieldPuns
-- OverloadedStrings
-- Rank2Types
-- ScopedTypeVariables
-- StandaloneDeriving
-- TypeApplications
-- TypeFamilies
-
 ghc-options:
 - -Wall
 - -Widentities

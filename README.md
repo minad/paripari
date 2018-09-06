@@ -24,16 +24,19 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Combinators for indentation-sensitive parsing
 * Most Parsec/Megaparsec combinators provided, relying on parser-combinators
 
-## Note: Issue with specialiser
+## Specialising all parsers
 
-As of now there is an issue with the GHC specialiser which I have yet to figure out.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
-`Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the specialiser
-does not kick in. As a workaround I am using the script `gen-parser-specialiser` as a
-preprocessor which enforces the specialisation of all parsers.
+`Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
+GHC specialiser does not kick in. As a workaround we use the `specialise-all` as a
+preprocessor script. The script processes our custom `SPECIALISE_ALL` pragmas.
 
-```
-{-# OPTIONS_GHC -F -pgmF ./ghc-specialise-parser #-}
+``` haskell
+{-# OPTIONS_GHC -F -pgmF ./specialise-all #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
 ```
 
 ## Example
@@ -54,8 +57,20 @@ Note that even in the case of `ByteStrings` a `CharParser` instance
 is provided, which interprets the bytes as UTF-8.
 
 ``` haskell
-type StringType = B.ByteString
-type Parser a = (forall p. CharParser StringType p => p a)
+type StringType    = B.ByteString
+type ParserMonad p = CharParser StringType p
+type Parser a      = (forall p. ParserMonad p => p a)
+```
+
+Now we have to ensure that the GHC specialiser kicks in
+and specialises all parsers. These pragmas are processed
+by the preprocessor script `specialise-all`.
+
+``` haskell
+{-# SPECIALISE_ALL ParserMonad p => p ~ Acceptor StringType #-}
+{-# SPECIALISE_ALL ParserMonad p => p ~ Reporter StringType #-}
+{-# SPECIALISE_ALL Parser => Acceptor StringType #-}
+{-# SPECIALISE_ALL Parser => Reporter StringType #-}
 ```
 
 ``` haskell

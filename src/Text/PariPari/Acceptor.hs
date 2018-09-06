@@ -1,3 +1,10 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Text.PariPari.Acceptor (
   Acceptor
   , runAcceptor
@@ -201,7 +208,7 @@ instance CharChunk k => CharParser k (Acceptor k) where
 
   asciiSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
-        b' = fromIntegral b
+        b' = fromIntegral b :: Word8
     in if | b < 128, f b' ->
               ok b' st
               { _stOff = _stOff + 1

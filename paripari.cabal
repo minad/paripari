@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 35756a9a60510ac70bf5f0897813dd60f273a41fb741eecbf969cb896b0644d2
+-- hash: 0fecef05436cf2bf2c831c206a3b59ca174b64c75c0f7c424720f8a6fcbb4e2e
 
 name:           paripari
 version:        0.1.0.0
@@ -37,7 +37,6 @@ library
       Paths_paripari
   hs-source-dirs:
       src
-  default-extensions: BangPatterns DeriveGeneric FlexibleContexts FlexibleInstances FunctionalDependencies GeneralizedNewtypeDeriving MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types ScopedTypeVariables StandaloneDeriving TypeApplications TypeFamilies
   ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
@@ -50,7 +49,6 @@ executable example
   main-is: example.hs
   other-modules:
       Paths_paripari
-  default-extensions: BangPatterns DeriveGeneric FlexibleContexts FlexibleInstances FunctionalDependencies GeneralizedNewtypeDeriving MultiWayIf NamedFieldPuns OverloadedStrings Rank2Types ScopedTypeVariables StandaloneDeriving TypeApplications TypeFamilies
   ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5

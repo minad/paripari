@@ -1,3 +1,4 @@
+{-# LANGUAGE Rank2Types #-}
 module Text.PariPari (
   module Text.PariPari.Class
   , module Text.PariPari.Combinators

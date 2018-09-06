@@ -1,4 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module Text.PariPari.Internal (
   Chunk(..)
   , CharChunk(..)
@@ -13,6 +16,7 @@ module Text.PariPari.Internal (
 import Data.Bits (unsafeShiftL, (.|.), (.&.))
 import Data.ByteString (ByteString)
 import Data.Foldable (foldl')
+import Data.String (fromString)
 import Data.Text (Text)
 import Data.Word (Word8)
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
@@ -75,7 +79,7 @@ instance Chunk ByteString where
   {-# INLINE packChunk #-}
 
   unpackChunk k =
-    let (B.PS b i n) = k <> "\0\0\0" -- sentinel
+    let (B.PS b i n) = k <> fromString "\0\0\0" -- sentinel
     in (b, i, n - 3)
   {-# INLINE unpackChunk #-}
 
@@ -120,7 +124,7 @@ instance Chunk Text where
   {-# INLINE packChunk #-}
 
   unpackChunk k =
-    let (T.Text b i n) = k <> "\0" -- sentinel
+    let (T.Text b i n) = k <> fromString "\0" -- sentinel
     in (b, i, n - 1)
   {-# INLINE unpackChunk #-}
 

@@ -1,9 +1,19 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 module Text.PariPari.Reporter (
   Reporter
   , Report(..)
   , runReporter
   , runReporterWithOptions
-  , ErrorContext
+  , ErrorContext(..)
   , showReport
   , showErrors
   , ReportOptions(..)
@@ -23,7 +33,10 @@ import Text.PariPari.Class
 import qualified Control.Monad.Fail as Fail
 import qualified Data.List.NonEmpty as NE
 
-type ErrorContext = ([Error], [String])
+data ErrorContext = ErrorContext
+  { _ecErrors  :: [Error]
+  , _ecContext :: [String]
+  } deriving (Eq, Show, Generic)
 
 data ReportOptions = ReportOptions
   { _optMaxContexts         :: !Int
@@ -241,7 +254,7 @@ instance CharChunk k => CharParser k (Reporter k) where
 
   asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
-        b' = fromIntegral b
+        b' = fromIntegral b :: Word8
     in if | b < 128, f b' ->
               ok b' st
               { _stOff = _stOff + 1
@@ -306,9 +319,9 @@ addError env st e
 
 mkError :: Env k -> Error -> Maybe ErrorContext
 mkError env e
-  | _envHidden env, (l:ls) <- _envContext env = Just $ ([EExpected [l]], ls)
+  | _envHidden env, (l:ls) <- _envContext env = Just $ ErrorContext [EExpected [l]] ls
   | _envHidden env = Nothing
-  | otherwise = Just $ ([e], _envContext env)
+  | otherwise = Just $ ErrorContext [e] $ _envContext env
 {-# INLINE mkError #-}
 
 -- | Merge errors of two states, used when backtracking
@@ -330,12 +343,15 @@ groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
 
 shrinkErrors :: Env k -> [ErrorContext] -> [ErrorContext]
-shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn snd . sortOn snd
+shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn _ecContext . sortOn _ecContext
 
 -- | Shrink error context by deleting duplicates
 -- and merging errors if possible.
 mergeErrorContexts :: Env k -> NonEmpty ErrorContext -> ErrorContext
-mergeErrorContexts env es@((_, ctx):| _) = (take (_optMaxErrorsPerContext._envOptions $ env) $ nubSort $ mergeEExpected $ concatMap fst $ NE.toList es, ctx)
+mergeErrorContexts env es@(ErrorContext{_ecContext}:| _) = ErrorContext
+  { _ecErrors = take (_optMaxErrorsPerContext._envOptions $ env) $ nubSort $ mergeEExpected $ concatMap _ecErrors $ NE.toList es
+  , _ecContext = _ecContext
+  }
 
 mergeEExpected :: [Error] -> [Error]
 mergeEExpected es = [EExpected $ nubSort expects | not (null expects)] <> filter (null . asEExpected) es
@@ -413,7 +429,9 @@ showErrors [] = "No errors"
 showErrors es = intercalate "\n" $ map showErrorContext es
 
 showErrorContext :: ErrorContext -> String
-showErrorContext (e, c) = intercalate ", " (map showError e) <> showContext c <> "."
+showErrorContext ec =
+  intercalate ", " (map showError $ _ecErrors ec)
+  <> showContext (_ecContext ec) <> "."
 
 showContext :: [String] -> String
 showContext [] = ""

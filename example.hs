@@ -1,10 +1,22 @@
 
+{-# OPTIONS_GHC -F -pgmF ./specialise-all #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE Rank2Types #-}
+
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
 
-type StringType = B.ByteString
-type Parser a = (forall p. CharParser StringType p => p a)
+type StringType    = B.ByteString
+type ParserMonad p = CharParser StringType p
+type Parser a      = (forall p. ParserMonad p => p a)
+
+{-# SPECIALISE_ALL ParserMonad p => p ~ Acceptor StringType #-}
+{-# SPECIALISE_ALL ParserMonad p => p ~ Reporter StringType #-}
+{-# SPECIALISE_ALL Parser => Acceptor StringType #-}
+{-# SPECIALISE_ALL Parser => Reporter StringType #-}
 
 data Value
   = Object ![(StringType, Value)]

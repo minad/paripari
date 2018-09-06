@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FunctionalDependencies #-}
 module Text.PariPari.Class (
   ChunkParser(..)
   , Chunk(Element, showElement, showChunk)
