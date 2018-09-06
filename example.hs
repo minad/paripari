@@ -35,7 +35,7 @@ value =
     <|> number
 
 text :: Parser Text
-text = char '"' *> asString (skipMany $ satisfy (/= '"')) <* char '"' <?> "text"
+text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 
 number :: Parser Value
 number = label "number" $ do
@@ -44,7 +44,7 @@ number = label "number" $ do
   pure $ Number (neg c) e
 
 space :: Parser ()
-space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
+space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 
 main :: IO ()
 main = do

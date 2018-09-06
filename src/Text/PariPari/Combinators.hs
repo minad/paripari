@@ -74,12 +74,23 @@ module Text.PariPari.Combinators (
   , string
   , string'
   , asString
-  , takeString
+  , takeBytes
+  , takeChars
+  , takeCharsWhile
+  , takeBytesWhile
+  , takeCharsWhile1
+  , takeBytesWhile1
+  , skipBytes
+  , skipChars
+  , skipCharsWhile
+  , skipBytesWhile
+  , skipCharsWhile1
+  , skipBytesWhile1
 ) where
 
-import Control.Applicative ((<|>))
-import Control.Monad (when)
-import Control.Monad.Combinators (option, skipCount)
+import Control.Applicative ((<|>), optional)
+import Control.Monad (when, void)
+import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.List.NonEmpty (NonEmpty(..))
 import Text.PariPari.Ascii
 import Text.PariPari.Class
@@ -200,7 +211,7 @@ integer' sep base = label (integerLabel base) $ do
   accum 1 $ fromIntegral d
   where accum !i !n = next i n <|> pure (n, i)
         next !i !n = do
-          sep
+          void $ sep
           d <- digit base
           accum (i + 1) $ n * fromIntegral base + fromIntegral d
 {-# INLINE integer' #-}
@@ -214,7 +225,7 @@ integer sep base = label (integerLabel base) $ do
   accum $ fromIntegral d
   where accum !n = next n <|> pure n
         next !n = do
-          sep
+          void $ sep
           d <- digit base
           accum $ n * fromIntegral base + fromIntegral d
 {-# INLINE integer #-}
@@ -271,7 +282,7 @@ fraction :: (Num a, MonadParser p) => p expSep -> Int -> Int -> p digitSep -> p 
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
   coeff <- integer digitSep coeffBase
-  A.optional $ byte asc_point
+  void $ optional $ byte asc_point
   (frac, fracLen) <- option (0, 0) $ integer' digitSep coeffBase
   expVal <- option 0 $ expSep *> signed (integer digitSep 10)
   pure (coeff * fromIntegral coeffBase ^ fracLen + frac,
@@ -379,10 +390,65 @@ asString :: MonadParser p => p () -> p Text
 asString p = T.decodeUtf8 <$> asBytes p
 {-# INLINE asString #-}
 
+-- | Take the next n bytes and advance the position by n bytes
+takeBytes :: Int -> Parser ByteString
+takeBytes n = asBytes (skipBytes n) <?> show n <> " bytes"
+{-# INLINE takeBytes #-}
+
+-- | Skip the next n bytes
+skipBytes :: Int -> Parser ()
+skipBytes n = skipCount n anyByte
+{-# INLINE skipBytes #-}
+
+-- | Skip the next n characters
+skipChars :: Int -> Parser ()
+skipChars n = skipCount n anyChar
+{-# INLINE skipChars #-}
+
 -- | Take the next n characters and advance the position by n characters
-takeString :: Int -> Parser Text
-takeString n = asString (skipCount n anyChar) <?> "string of length " <> show n
-{-# INLINE takeString #-}
+takeChars :: Int -> Parser Text
+takeChars n = asString (skipChars n) <?> "string of length " <> show n
+{-# INLINE takeChars #-}
+
+-- | Skip char while predicate is true
+skipCharsWhile :: (Char -> Bool) -> Parser ()
+skipCharsWhile f = skipMany (satisfy f)
+{-# INLINE skipCharsWhile #-}
+
+-- | Take chars while predicate is true
+takeCharsWhile :: (Char -> Bool) -> Parser Text
+takeCharsWhile f = asString (skipCharsWhile f)
+{-# INLINE takeCharsWhile #-}
+
+-- | Skip bytes while predicate is true
+skipBytesWhile :: (Word8 -> Bool) -> Parser ()
+skipBytesWhile f = skipMany (byteSatisfy f)
+{-# INLINE skipBytesWhile #-}
+
+-- | Takes bytes while predicate is true
+takeBytesWhile :: (Word8 -> Bool) -> Parser ByteString
+takeBytesWhile f = asBytes (skipBytesWhile f)
+{-# INLINE takeBytesWhile #-}
+
+-- | Skip at least one byte while predicate is true
+skipBytesWhile1 :: (Word8 -> Bool) -> Parser ()
+skipBytesWhile1 f = byteSatisfy f *> skipBytesWhile f
+{-# INLINE skipBytesWhile1 #-}
+
+-- | Take at least one byte while predicate is true
+takeBytesWhile1 :: (Word8 -> Bool) -> Parser ByteString
+takeBytesWhile1 f = asBytes (skipBytesWhile1 f)
+{-# INLINE takeBytesWhile1 #-}
+
+-- | Skip at least one byte while predicate is true
+skipCharsWhile1 :: (Char -> Bool) -> Parser ()
+skipCharsWhile1 f = satisfy f *> skipCharsWhile f
+{-# INLINE skipCharsWhile1 #-}
+
+-- | Take at least one byte while predicate is true
+takeCharsWhile1 :: (Char -> Bool) -> Parser Text
+takeCharsWhile1 f = asString (skipCharsWhile1 f)
+{-# INLINE takeCharsWhile1 #-}
 
 untitle :: String -> String
 untitle []     = []

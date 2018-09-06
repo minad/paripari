@@ -112,10 +112,6 @@ class (MonadFail p, MonadPlus p) => MonadParser p where
   -- result as bytes
   asBytes :: p () -> p ByteString
 
-  -- | Take the next n bytes from the current position
-  -- and advance the position by n.
-  takeBytes :: Int -> p ByteString
-
 -- | Pretty string representation of 'Error'
 showError :: Error -> String
 showError EEmpty                   = "No error"

@@ -105,7 +105,7 @@ value =
     <|> number
 
 text :: Parser Text
-text = char '"' *> asString (skipMany $ satisfy (/= '"')) <* char '"' <?> "text"
+text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 ```
 
 Floating point numbers are parsed by `fractionDec` which returns a coefficient,
@@ -124,7 +124,7 @@ For spaces we need another helper function.
 
 ``` haskell
 space :: Parser ()
-space = skipMany (satisfy (\c -> c == ' ' || c == '\n' || c == '\t'))
+space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 ```
 
 The main function of the example program reads a file, runs the parser
