@@ -24,7 +24,11 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Combinators for indentation-sensitive parsing
 * Most Parsec/Megaparsec combinators provided, relying on parser-combinators
 
-## Specialising all parsers
+## Example
+
+In this example we use PariPari to parse JSON. The following is literate haskell.
+
+### Specialising all parsers
 
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
@@ -37,19 +41,13 @@ preprocessor script. The script processes our custom `SPECIALISE_ALL` pragmas.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
-```
 
-## Example
-
-In this example we use PariPari to parse JSON.
-
-``` haskell
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
 ```
 
-We define a datatype of JSON values.
+### Basic parser types
 
 We parametrize the parser with the string type.
 Both `ByteString` and `Text` are supported.
@@ -73,6 +71,10 @@ by the preprocessor script `specialise-all`.
 {-# SPECIALISE_ALL Parser => Reporter StringType #-}
 ```
 
+### JSON datatype
+
+We define a datatype of JSON values.
+
 ``` haskell
 data Value
   = Object ![(StringType, Value)]
@@ -83,6 +85,8 @@ data Value
   | Null
   deriving (Eq, Show)
 ```
+
+### Parsers
 
 A JSON toplevel value is either an object or an array.
 
@@ -143,6 +147,8 @@ For spaces we need another helper function.
 space :: Parser ()
 space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 ```
+
+### Main function
 
 The main function of the example program reads a file, runs the parser
 and prints the value if the parsing succeeded.
