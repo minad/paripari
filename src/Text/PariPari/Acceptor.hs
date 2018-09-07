@@ -254,8 +254,8 @@ initialEnv _envFile _envBuf _envEnd = Env
   { _envBuf
   , _envFile
   , _envEnd
-  , _envRefLine = 0
-  , _envRefCol = 0
+  , _envRefLine = 1
+  , _envRefCol = 1
   }
 
 initialState :: Int -> State

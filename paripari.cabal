@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d0f4bfe9e2211bdd737a951ab6bd08142baead84186fbc4960a2d389c41a81e4
+-- hash: ec569e1ae9f209d368a6db0512b6237871d5cac93f20e30e9b6bc454089d6717
 
 name:           paripari
 version:        0.1.0.0
@@ -68,5 +68,23 @@ executable paripari-specialise-all
     , bytestring >=0.10 && <0.11
     , paripari
     , parser-combinators >=1.0 && <1.1
+    , text >=0.11 && <1.3
+  default-language: Haskell2010
+
+test-suite test
+  type: exitcode-stdio-1.0
+  main-is: test.hs
+  other-modules:
+      Paths_paripari
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  build-depends:
+      base >=4.8 && <5
+    , bytestring >=0.10 && <0.11
+    , paripari
+    , parser-combinators >=1.0 && <1.1
+    , tasty
+    , tasty-hunit
     , text >=0.11 && <1.3
   default-language: Haskell2010

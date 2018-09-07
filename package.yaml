@@ -39,3 +39,12 @@ executables:
   paripari-example:
     main: example.hs
     dependencies: paripari
+
+tests:
+  test:
+    source-dirs:   test
+    main:          test.hs
+    dependencies:
+      - tasty
+      - tasty-hunit
+      - paripari

@@ -395,8 +395,8 @@ initialEnv _envOptions _envFile _envBuf _envEnd = Env
   , _envContext = []
   , _envHidden  = False
   , _envCommit  = 0
-  , _envRefLine = 0
-  , _envRefCol  = 0
+  , _envRefLine = 1
+  , _envRefCol  = 1
   }
 
 initialState :: Int -> State
