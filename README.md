@@ -38,7 +38,8 @@ We specify a preprocessor, language pragmas and the library imports.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
 GHC specialiser does not kick in. As a workaround we use `paripari-specialise-all` as a
-preprocessor, which processes our custom `SPECIALISE_ALL` pragmas.
+preprocessor, which processes our custom `SPECIALISE_ALL` pragmas. Using the preprocessor
+is not necessary, however without it I observed 2x-4x slowdowns in parsing speed.
 
 ``` haskell
 {-# OPTIONS_GHC -F -pgmF paripari-specialise-all #-}
