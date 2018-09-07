@@ -26,7 +26,6 @@ import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Word (Word8)
 import Debug.Trace (trace)
 import GHC.Generics (Generic)
 import Text.PariPari.Internal
@@ -255,19 +254,18 @@ instance CharChunk k => CharParser k (Reporter k) where
 
   asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
-        b' = fromIntegral b :: Word8
-    in if | b < 128, f b' ->
-              ok b' st
+    in if | b /= 0, b < 128, f b ->
+              ok b st
               { _stOff = _stOff + 1
-              , _stLine = if b' == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b' == asc_newline then 1 else _stCol + 1
+              , _stLine = if b == asc_newline then _stLine + 1 else _stLine
+              , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
           | _stOff >= _envEnd env -> err st
-          | otherwise -> raiseError env st err $ EUnexpected $ showByte b'
+          | otherwise -> raiseError env st err $ EUnexpected $ showByte b
   {-# INLINE asciiSatisfy #-}
 
   asciiByte b = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if byteAt @k (_envBuf env) _stOff == fromIntegral b then
+      if byteAt @k (_envBuf env) _stOff == b then
         ok b st
         { _stOff = _stOff + 1
         , _stLine = if b == asc_newline then _stLine + 1 else _stLine

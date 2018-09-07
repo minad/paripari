@@ -51,7 +51,7 @@ class (Ord (Element k), Ord k) => Chunk k where
   showChunk :: k -> String
 
 class Chunk k => CharChunk k where
-  byteAt :: Buffer k -> Int -> Int
+  byteAt :: Buffer k -> Int -> Word8
   charAt :: Buffer k -> Int -> (Char, Int)
   charAtFixed :: Int -> Buffer k -> Int -> Char
   charWidth :: Char -> Int
@@ -87,7 +87,7 @@ instance Chunk ByteString where
   showChunk = showByteString
 
 instance CharChunk ByteString where
-  byteAt = at
+  byteAt = ptrByteAt
   {-# INLINE byteAt #-}
 
   charAt = ptrDecodeUtf8
@@ -147,10 +147,10 @@ instance CharChunk Text where
   textToChunk t = t
   {-# INLINE textToChunk #-}
 
-arrayByteAt :: T.Array -> Int -> Int
+arrayByteAt :: T.Array -> Int -> Word8
 arrayByteAt a i
   | c <- T.unsafeIndex a i, c <= 0xFF = fromIntegral c
-  | otherwise = 0x100
+  | otherwise = 0
 {-# INLINE arrayByteAt #-}
 
 arrayCharAt :: Int -> T.Array -> Int -> (Char, Int)
