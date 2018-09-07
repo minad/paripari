@@ -18,7 +18,7 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
   and fallback to slower error reporting parser (Reporter)
   to optimize the common case
 * Backtracking by default for ease of use
-* `commit` combinator to improve error messages by commiting to branches
+* `commit` combinator to improve error messages by committing to branches
 * Tracing parser to analyze backtracking
 * ByteStrings can be parsed as UTF-8
 * Combinators for indentation-sensitive parsing
