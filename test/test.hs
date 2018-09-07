@@ -63,19 +63,44 @@ charTests run =
 
   , testGroup "Integer Combinators"
     [ testCase "decimal" $ do
+        ok @Integer (decimal <* eof) "0123" 123
         ok @Integer (decimal <* eof) "1234567890" 1234567890
         ok @Integer (decimal <* string "abc" <* eof) "123abc" 123
         err @Integer decimal "abc"
 
     , testCase "octal" $ do
+        ok @Integer (octal <* eof) "0123" 0o123
         ok @Integer (octal <* eof) "12345670" 0o12345670
         ok @Integer (octal <* string "abc" <* eof) "123abc" 0o123
         err @Integer octal "8abc"
 
     , testCase "hexadecimal" $ do
+        ok @Integer (hexadecimal <* eof) "0123" 0x123
         ok @Integer (hexadecimal <* eof) "123456789aBcDeF0" 0x123456789ABCDEF0
         ok @Integer (hexadecimal <* string "xyz" <* eof) "123xyz" 0x123
         err @Integer hexadecimal "gabc"
+
+    , testCase "integer" $ do
+        err @Integer (integer (pure ()) 10) "abc"
+        ok @Integer (integer (char '_') 10) "1_2_3" 123
+        ok @Integer (integer (char '_') 10 <* char '_') "1_2_3_" 123
+        err @Integer (integer (char '_') 10) "_1_2_3"
+        ok @Integer (integer (optional $ char '_') 10) "123_456_789" 123456789
+
+        ok @Integer (integer (pure ()) 2) "101" 5
+        ok @Integer (integer (pure ()) 7) "321" 162
+        ok @Integer (integer (pure ()) 36) "XyZ" 44027
+
+    , testCase "integer'" $ do
+        err @(Integer, Int) (integer' (pure ()) 10) "abc"
+        ok @(Integer, Int) (integer' (char '_') 10) "1_2_3" (123, 3)
+        ok @(Integer, Int) (integer' (char '_') 10 <* char '_') "1_2_3_" (123, 3)
+        err @(Integer, Int) (integer' (char '_') 10) "_1_2_3"
+        ok @(Integer, Int) (integer' (optional $ char '_') 10) "123_456_789" (123456789, 9)
+
+        ok @(Integer, Int) (integer' (pure ()) 2) "101" (5, 3)
+        ok @(Integer, Int) (integer' (pure ()) 7) "321" (162, 3)
+        ok @(Integer, Int) (integer' (pure ()) 36) "XyZ" (44027, 3)
     ]
   ]
   where
@@ -229,8 +254,6 @@ notElement
 anyElement
 digitByte
 asciiByte
-integer
-integer'
 digit
 signed
 fractionHex
