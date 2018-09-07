@@ -11,6 +11,7 @@ module Text.PariPari.Acceptor (
 ) where
 
 import Control.Monad (void)
+import Data.Word (Word8)
 import Text.PariPari.Class
 import Text.PariPari.Internal
 import qualified Control.Monad.Fail as Fail
@@ -29,7 +30,7 @@ data State = State
   , _stCol     :: !Int
   }
 
--- | Parser which is optimized for fast parsing. Error reporting
+-- | Parser which is optimised for fast parsing. Error reporting
 -- is minimal.
 newtype Acceptor k a = Acceptor
   { unAcceptor :: forall b. Env k -> State
@@ -192,7 +193,7 @@ instance CharChunk k => CharParser k (Acceptor k) where
   {-# INLINE satisfy #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
-  -- of the character resulting in an optimized decoder.
+  -- of the character resulting in an optimised decoder.
   char c =
     let w = charWidth @k c
     in Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->

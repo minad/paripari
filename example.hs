@@ -1,5 +1,4 @@
 
-{-# OPTIONS_GHC -F -pgmF ./specialise-all #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -13,10 +12,10 @@ type StringType    = B.ByteString
 type ParserMonad p = CharParser StringType p
 type Parser a      = (forall p. ParserMonad p => p a)
 
-{-# SPECIALISE_ALL ParserMonad p => p ~ Acceptor StringType #-}
-{-# SPECIALISE_ALL ParserMonad p => p ~ Reporter StringType #-}
-{-# SPECIALISE_ALL Parser => Acceptor StringType #-}
-{-# SPECIALISE_ALL Parser => Reporter StringType #-}
+-- {-# SPECIALISE_ALL ParserMonad p = p ~ Acceptor StringType #-}
+-- {-# SPECIALISE_ALL ParserMonad p = p ~ Reporter StringType #-}
+-- {-# SPECIALISE_ALL Parser = Acceptor StringType #-}
+-- {-# SPECIALISE_ALL Parser = Reporter StringType #-}
 
 data Value
   = Object ![(StringType, Value)]
@@ -68,8 +67,8 @@ main = do
     [file] -> do
       b <- B.readFile file
       case runCharParser json file b of
-        Left x  -> do
-          putStrLn $ showReport x
+        Left report -> do
+          putStrLn $ showReport report
           print $ runTracer json file b
-        Right x -> print x
-    _ -> error "Usage: example test.json"
+        Right val -> print val
+    _ -> error "Usage: paripari-example test.json"

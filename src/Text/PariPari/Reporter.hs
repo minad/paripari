@@ -26,6 +26,7 @@ import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Word (Word8)
 import Debug.Trace (trace)
 import GHC.Generics (Generic)
 import Text.PariPari.Internal
@@ -74,7 +75,7 @@ data State = State
   , _stErrors    :: [ErrorContext]
   }
 
--- | Parser which is optimized for good error reports.
+-- | Parser which is optimised for good error reports.
 -- Performance is secondary, since the 'Reporter' is used
 -- as a fallback to the 'Acceptor'.
 newtype Reporter k a = Reporter
@@ -238,7 +239,7 @@ instance CharChunk k => CharParser k (Reporter k) where
   {-# INLINE satisfy #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
-  -- of the character resulting in an optimized decoder.
+  -- of the character resulting in an optimised decoder.
   char c =
     let w = charWidth @k c
     in Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->

@@ -7,7 +7,6 @@ module Text.PariPari.Class (
   , CharParser(..)
   , Alternative(..)
   , MonadPlus
-  , Word8
   , Pos(..)
   , Error(..)
   , showError

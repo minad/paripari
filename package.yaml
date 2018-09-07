@@ -32,10 +32,10 @@ dependencies:
 library:
   source-dirs: src
 
-extra-source-files:
-- specialise-all
-
 executables:
-  example:
+  paripari-specialise-all:
+    main: specialise-all.hs
+    dependencies: paripari
+  paripari-example:
     main: example.hs
     dependencies: paripari

@@ -3,15 +3,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 module Text.PariPari.Combinators (
-  -- * Basics
-  Text
-  , void
+  -- * Basic combinators
+  void
   , (<|>)
   , empty
   , optional
 
   -- * Control.Monad.Combinators.NonEmpty
-  , NonEmpty(..)
   , ON.some
   , ON.endBy1
   , ON.someTill
@@ -93,11 +91,11 @@ module Text.PariPari.Combinators (
 import Control.Applicative ((<|>), empty, optional)
 import Control.Monad (when)
 import Control.Monad.Combinators (option, skipCount, skipMany)
-import Data.List.NonEmpty (NonEmpty(..))
 import Text.PariPari.Internal
 import Text.PariPari.Class
 import Data.Text (Text)
 import Data.Functor (void)
+import Data.Word (Word8)
 import Prelude hiding (getLine)
 import qualified Control.Monad.Combinators as O
 import qualified Control.Monad.Combinators.NonEmpty as ON
@@ -182,7 +180,7 @@ linefold = line <|> indented
 {-# INLINE linefold #-}
 
 -- | Parser a single byte different from the given one
-notElement :: forall k. Element k -> ChunkP k (Element k)
+notElement :: forall k p. ChunkParser k p => Element k -> p (Element k)
 notElement e = elementSatisfy @k (/= e) <?> "not " <> showElement @k e
 {-# INLINE notElement #-}
 
@@ -193,7 +191,7 @@ anyElement = elementSatisfy (const True)
 
 -- | Parse a digit byte for the given base.
 -- Bases 2 to 36 are supported.
-digitByte :: Int -> CharP k Word8
+digitByte :: CharParser k p => Int -> p Word8
 digitByte base = asciiSatisfy (isDigit base)
 {-# INLINE digitByte #-}
 
@@ -215,7 +213,7 @@ digitToInt base b
 
 -- | Parse a single digit of the given base and return its value.
 -- Bases 2 to 36 are supported.
-digit :: Int -> CharP k Word
+digit :: CharParser k p => Int -> p Word
 digit base = digitToInt base <$> asciiSatisfy (isDigit base)
 {-# INLINE digit #-}
 
@@ -301,7 +299,7 @@ fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 s
 {-# INLINE fractionHex #-}
 
 -- | Parse a case-insensitive character
-char' :: Char -> CharP k Char
+char' :: CharParser k p => Char -> p Char
 char' x =
   let l = C.toLower x
       u = C.toUpper x
@@ -309,7 +307,7 @@ char' x =
 {-# INLINE char' #-}
 
 -- | Parse a character different from the given one.
-notChar :: Char -> CharP k Char
+notChar :: CharParser k p => Char -> p Char
 notChar c = satisfy (/= c)
 {-# INLINE notChar #-}
 
@@ -355,7 +353,7 @@ punctuationChar = satisfy C.isPunctuation <?> "punctuation"
 
 -- | Parse a digit character of the given base.
 -- Bases 2 to 36 are supported.
-digitChar :: Int -> CharP k Char
+digitChar :: CharParser k p => Int -> p Char
 digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
 
@@ -365,7 +363,7 @@ asciiChar = unsafeAsciiToChar <$> asciiSatisfy (const True)
 {-# INLINE asciiChar #-}
 
 -- | Parse a character belonging to the given Unicode category
-categoryChar :: C.GeneralCategory -> CharP k Char
+categoryChar :: CharParser k p => C.GeneralCategory -> p Char
 categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
 {-# INLINE categoryChar #-}
 
@@ -377,66 +375,66 @@ untitle (x:xs) = C.toLower x : go xs
                   | otherwise   = y : ys
 
 -- | Skip the next n elements
-skipElements :: Int -> ChunkP k ()
+skipElements :: ChunkParser k p => Int -> p ()
 skipElements n = skipCount n anyElement
 {-# INLINE skipElements #-}
 
 -- | Take the next n elements and advance the position by n
-takeElements :: Int -> ChunkP k k
+takeElements :: ChunkParser k p => Int -> p k
 takeElements n = asChunk (skipElements n) <?> show n <> " elements"
 {-# INLINE takeElements #-}
 
 -- | Skip elements while predicate is true
-skipElementsWhile :: (Element k -> Bool) -> ChunkP k ()
+skipElementsWhile :: ChunkParser k p => (Element k -> Bool) -> p ()
 skipElementsWhile f = skipMany (elementSatisfy f)
 {-# INLINE skipElementsWhile #-}
 
 -- | Takes elements while predicate is true
-takeElementsWhile :: (Element k -> Bool) -> ChunkP k k
+takeElementsWhile :: ChunkParser k p => (Element k -> Bool) -> p k
 takeElementsWhile f = asChunk (skipElementsWhile f)
 {-# INLINE takeElementsWhile #-}
 
 -- | Skip at least one element while predicate is true
-skipElementsWhile1 :: (Element k -> Bool) -> ChunkP k ()
+skipElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p ()
 skipElementsWhile1 f = elementSatisfy f *> skipElementsWhile f
 {-# INLINE skipElementsWhile1 #-}
 
 -- | Take at least one element while predicate is true
-takeElementsWhile1 :: (Element k -> Bool) -> ChunkP k k
+takeElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p k
 takeElementsWhile1 f = asChunk (skipElementsWhile1 f)
 {-# INLINE takeElementsWhile1 #-}
 
 -- | Skip the next n characters
-skipChars :: Int -> CharP k ()
+skipChars :: CharParser k p => Int -> p ()
 skipChars n = skipCount n anyChar
 {-# INLINE skipChars #-}
 
 -- | Skip char while predicate is true
-skipCharsWhile :: (Char -> Bool) -> CharP k ()
+skipCharsWhile :: CharParser k p => (Char -> Bool) -> p ()
 skipCharsWhile f = skipMany (satisfy f)
 {-# INLINE skipCharsWhile #-}
 
 -- | Skip at least one char while predicate is true
-skipCharsWhile1 :: (Char -> Bool) -> CharP k ()
+skipCharsWhile1 :: CharParser k p => (Char -> Bool) -> p ()
 skipCharsWhile1 f = satisfy f *> skipCharsWhile f
 {-# INLINE skipCharsWhile1 #-}
 
 -- | Take the next n characters and advance the position by n characters
-takeChars :: Int -> CharP k k
+takeChars :: CharParser k p => Int -> p k
 takeChars n = asChunk (skipChars n) <?> "string of length " <> show n
 {-# INLINE takeChars #-}
 
 -- | Take chars while predicate is true
-takeCharsWhile :: (Char -> Bool) -> CharP k k
+takeCharsWhile :: CharParser k p => (Char -> Bool) -> p k
 takeCharsWhile f = asChunk (skipCharsWhile f)
 {-# INLINE takeCharsWhile #-}
 
 -- | Take at least one byte while predicate is true
-takeCharsWhile1 :: (Char -> Bool) -> CharP k k
+takeCharsWhile1 :: CharParser k p => (Char -> Bool) -> p k
 takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
 {-# INLINE takeCharsWhile1 #-}
 
 -- | Parse a string
-string :: Text -> CharP k Text
+string :: CharParser k p => Text -> p Text
 string t = t <$ chunk (textToChunk t)
 {-# INLINE string #-}

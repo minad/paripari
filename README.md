@@ -1,15 +1,19 @@
 # PariPari: Fast parser combinator library for Haskell
 
+PariPari is a parser combinator library for Haskell. PariPari can be used as
+a drop in replacement for the Parsec class of libraries. However be aware that the library
+is new and unstable.
+
 PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter which are evaluated in parallel. If the Acceptor fails, the Reporter returns a report about the parsing errors.
 This allows for fast parsing in the good case without compromising on the quality of the error messages. I have seen
-this idea coming up multiple times before (Trifecta after Attoparsec etc...). However this library provides both parsers
-out of the box with equivalent behaviour, in particular with respect to backtracking.
+this idea coming up times before, suggesting to use two different libraries (Trifecta after Attoparsec etc...).
+This library provides both parsers out of the box with equivalent behaviour, in particular with respect to backtracking.
 
-Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages due to the backtracking the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
+Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
-PariPari operates on strict `ByteString` and `Text`. If characters are parsed using the `char` and
-`satisfy` combinators, bytestrings are interpreted as UTF-8 and decoded on the fly.
+PariPari operates on strict `ByteString` and `Text`.
 As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
+If characters are parsed using the `char` and `satisfy` combinators, bytestrings are interpreted as UTF-8 and decoded on the fly.
 In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
 ## Features
@@ -33,11 +37,11 @@ In this example we use PariPari to parse JSON. The following is literate haskell
 We specify a preprocessor, language pragmas and the library imports.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
-GHC specialiser does not kick in. As a workaround we use the `specialise-all` as a
-preprocessor script. The script processes our custom `SPECIALISE_ALL` pragmas.
+GHC specialiser does not kick in. As a workaround we use `paripari-specialise-all` as a
+preprocessor, which processes our custom `SPECIALISE_ALL` pragmas.
 
 ``` haskell
-{-# OPTIONS_GHC -F -pgmF ./specialise-all #-}
+{-# OPTIONS_GHC -F -pgmF paripari-specialise-all #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -61,15 +65,19 @@ type ParserMonad p = CharParser StringType p
 type Parser a      = (forall p. ParserMonad p => p a)
 ```
 
-Now we have to ensure that the GHC specialiser kicks in
+The `Parser` shortcut can be used for simple combinators.
+For functions returning parsers, the `ParserMonad` constraint must
+be used for specialization to work, e.g., `char :: ParserMonad p => Char -> p Char`.
+
+Now we ensure that the GHC specialiser kicks in
 and specialises all parsers. These pragmas are processed
-by the preprocessor script `specialise-all`.
+by the preprocessor `paripari-specialise-all`.
 
 ``` haskell
-{-# SPECIALISE_ALL ParserMonad p => p ~ Acceptor StringType #-}
-{-# SPECIALISE_ALL ParserMonad p => p ~ Reporter StringType #-}
-{-# SPECIALISE_ALL Parser => Acceptor StringType #-}
-{-# SPECIALISE_ALL Parser => Reporter StringType #-}
+{-# SPECIALISE_ALL ParserMonad p = p ~ Acceptor StringType #-}
+{-# SPECIALISE_ALL ParserMonad p = p ~ Reporter StringType #-}
+{-# SPECIALISE_ALL Parser = Acceptor StringType #-}
+{-# SPECIALISE_ALL Parser = Reporter StringType #-}
 ```
 
 ### JSON datatype
@@ -164,11 +172,11 @@ main = do
     [file] -> do
       b <- B.readFile file
       case runCharParser json file b of
-        Left x  -> do
-          putStrLn $ showReport x
+        Left report -> do
+          putStrLn $ showReport report
           print $ runTracer json file b
-        Right x -> print x
-    _ -> error "Usage: example test.json"
+        Right val -> print val
+    _ -> error "Usage: paripari-example test.json"
 ```
 
 ## Benchmark

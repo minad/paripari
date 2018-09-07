@@ -1,4 +1,0 @@
-#!/bin/sh
-cat "$2" > "$3"
-#cat "$2" | grep -P ':: Parser |:: MonadParser p =>' | sed 's/MonadParser p => //g;s/ Parser / Acceptor /g;s/ p / Acceptor /g;s/^/{-# SPECIALISE /;s/$/ #-}/' >> "$3"
-#cat "$2" | grep -P ':: Parser |:: MonadParser p =>' | sed 's/MonadParser p => //g;s/ Parser / Reporter /g;s/ p / Reporter /g;s/^/{-# SPECIALISE /;s/$/ #-}/' >> "$3"

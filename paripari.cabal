@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c33d8269065d94e7fbcbb78d41e648fda256c415f440152bf6534395704fa7f6
+-- hash: d0f4bfe9e2211bdd737a951ab6bd08142baead84186fbc4960a2d389c41a81e4
 
 name:           paripari
 version:        0.1.0.0
@@ -20,8 +20,6 @@ license-file:   LICENSE
 tested-with:    GHC == 8.4.3, GHC == 8.6.1
 build-type:     Simple
 cabal-version:  >= 1.10
-extra-source-files:
-    specialise-all
 
 source-repository head
   type: git
@@ -47,8 +45,21 @@ library
     , text >=0.11 && <1.3
   default-language: Haskell2010
 
-executable example
+executable paripari-example
   main-is: example.hs
+  other-modules:
+      Paths_paripari
+  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  build-depends:
+      base >=4.8 && <5
+    , bytestring >=0.10 && <0.11
+    , paripari
+    , parser-combinators >=1.0 && <1.1
+    , text >=0.11 && <1.3
+  default-language: Haskell2010
+
+executable paripari-specialise-all
+  main-is: specialise-all.hs
   other-modules:
       Paths_paripari
   ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances

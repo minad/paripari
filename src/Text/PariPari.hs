@@ -27,7 +27,6 @@ import GHC.Conc (par)
 runCharParser :: CharChunk k => (forall p. CharParser k p => p a) -> FilePath -> k -> Either Report a
 runCharParser = runCharParserWithOptions defaultReportOptions
 {-# INLINE runCharParser #-}
--- Inline to force the specializer to kick in
 
 -- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **sequentially**.
 -- The 'FilePath' is used for error reporting.
@@ -64,7 +63,6 @@ runSeqCharParserWithOptions o p f b =
 runChunkParser :: CharChunk k => (forall p. ChunkParser k p => p a) -> FilePath -> k -> Either Report a
 runChunkParser = runCharParserWithOptions defaultReportOptions
 {-# INLINE runChunkParser #-}
--- Inline to force the specializer to kick in
 
 -- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **sequentially**.
 -- The 'FilePath' is used for error reporting.
