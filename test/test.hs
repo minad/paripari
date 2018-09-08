@@ -64,6 +64,7 @@ charTests run =
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
         ok (asciiByte asc_a <* eof) "a" asc_a
+        ok (asciiByte 127 <* eof) "\x7F" 127
         err (asciiByte asc_0) "abc"
         err (asciiByte asc_0) ""
     ]
@@ -91,6 +92,7 @@ charTests run =
         ok (char' 'a') "A" 'A'
         ok (char' 'A') "a" 'a'
         ok (char' 'A') "A" 'A'
+        ok (char' '9') "9" '9'
         err (char' 'a') "b"
         err (char' 'a') ""
 
@@ -156,11 +158,6 @@ charTests run =
         ok (categoryChar C.UppercaseLetter <* eof) "A" 'A'
         err (categoryChar C.UppercaseLetter) "a"
         err (categoryChar C.UppercaseLetter) ""
-
-    , testCase "asciiByte" $ do
-        ok (asciiByte asc_a <* eof) "a" asc_a
-        err (asciiByte asc_a) "\0"
-        err (asciiByte asc_a) ""
 
     , testCase "digitByte" $ do
         ok (digitByte 2 <* eof) "0" asc_0
@@ -284,6 +281,7 @@ chunkTests run =
         ok eof "" ()
         ok (chunk "abc" *> eof) "abc" ()
         err eof "abc"
+        err eof "\0"
         err (chunk "ab" *> eof) "abc"
 
     , testCase "label" $ do
