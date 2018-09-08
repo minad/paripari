@@ -13,7 +13,7 @@ import Prelude hiding (getLine)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.PariPari
-import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0)
+import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
 
 main :: IO ()
@@ -156,6 +156,17 @@ charTests run =
         ok (categoryChar C.UppercaseLetter <* eof) "A" 'A'
         err (categoryChar C.UppercaseLetter) "a"
         err (categoryChar C.UppercaseLetter) ""
+
+    , testCase "asciiByte" $ do
+        ok (asciiByte asc_a <* eof) "a" asc_a
+        err (asciiByte asc_a) "\0"
+        err (asciiByte asc_a) ""
+
+    , testCase "digitByte" $ do
+        ok (digitByte 2 <* eof) "0" asc_0
+        ok (digitByte 10 <* eof) "9" asc_9
+        err (digitByte 10) "\0"
+        err (digitByte 10) ""
     ]
 
   , testGroup "Integer Combinators"
@@ -420,8 +431,6 @@ align
 indented
 line
 linefold
-digitByte
-asciiByte
 fractionHex
 fractionDec
 skipChars
