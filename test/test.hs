@@ -380,6 +380,10 @@ chunkTests run =
     [ testCase "(<|>)" $ do
         ok (element 'b' <|> element 'a' <|> element 'c') "abc" 'a'
         ok (chunk "abd" <|> chunk "abc" <|> chunk "abe") "abcdef" "abc"
+
+    , testCase "empty" $ do
+        err (empty :: p ()) "abc"
+        err (empty :: p ()) ""
     ]
   ]
   where
@@ -398,7 +402,6 @@ Applicative
 Monad
 MonadPlus
 Alternative:
-empty
 optional
 some
 
