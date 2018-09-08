@@ -101,13 +101,27 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
 
 class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
   -- | Parse a single character
+  --
+  -- __Note__: The character '\0' cannot be parsed using this combinator
+  -- since it is used as decoding sentinel. Use 'element' instead.
   char :: Char -> p Char
 
   -- | Parse a single character with the given predicate
+  --
+  -- __Note__: The character '\0' cannot be parsed using this combinator
+  -- since it is used as decoding sentinel. Use 'elementSatisfy' instead.
   satisfy :: (Char -> Bool) -> p Char
 
+  -- | Parse a single character within the ASCII charset
+  --
+  -- __Note__: The character '\0' cannot be parsed using this combinator
+  -- since it is used as decoding sentinel. Use 'element' instead.
   asciiByte :: Word8 -> p Word8
 
+  -- | Parse a single character within the ASCII charset with the given predicate
+  --
+  -- __Note__: The character '\0' cannot be parsed using this combinator
+  -- since it is used as decoding sentinel. Use 'elementSatisfy' instead.
   asciiSatisfy :: (Word8 -> Bool) -> p Word8
 
 -- | Pretty string representation of 'Error'
