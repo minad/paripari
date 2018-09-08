@@ -278,7 +278,7 @@ chunkTests run =
         err (lookAhead (element 'a')) ""
 
     , testCase "failWith" $
-        err (failWith EEmpty :: p ()) "abc"
+        err (failWith (ECombinator "empty") :: p ()) "abc"
 
     , testCase "eof" $ do
         ok eof "" ()
@@ -375,7 +375,7 @@ chunkTests run =
 
   , testGroup "MonadFail"
     [ testCase "fail" $ do
-        err (failWith EEmpty :: p ()) "abc"
+        err (failWith (ECombinator "empty") :: p ()) "abc"
     ]
 
   , testGroup "Alternative"

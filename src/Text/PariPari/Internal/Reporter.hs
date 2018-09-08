@@ -188,8 +188,9 @@ instance Chunk k => ChunkParser k (Reporter k) where
   {-# INLINE eof #-}
 
   element e = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    if | _stOff >= _envEnd env -> err st
-       | (e', w) <- elementAt @k (_envBuf env) _stOff, e == e',
+    if | _stOff < _envEnd env,
+         (e', w) <- elementAt @k (_envBuf env) _stOff,
+         e == e',
          pos <- elementPos @k e (Pos _stLine _stCol) ->
            ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
        | otherwise ->
@@ -198,8 +199,11 @@ instance Chunk k => ChunkParser k (Reporter k) where
 
   elementSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let (e, w) = elementAt @k (_envBuf env) _stOff
-    in if | _stOff >= _envEnd env -> err st
-          | f e, pos <- elementPos @k e (Pos _stLine _stCol) ->
+    in if | _stOff >= _envEnd env ->
+              raiseError env st err $ EUnexpected "end of file"
+          | _stOff < _envEnd env,
+            f e,
+            pos <- elementPos @k e (Pos _stLine _stCol) ->
               ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
           | otherwise ->
               raiseError env st err $ EUnexpected $ showElement @k e
@@ -224,18 +228,20 @@ instance Chunk k => ChunkParser k (Reporter k) where
 
 instance CharChunk k => CharParser k (Reporter k) where
   satisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let (c, w) = charAt @k (_envBuf env) _stOff
-    in if | c /= '\0' ->
-            if f c then
-              ok c st
-              { _stOff = _stOff + w
-              , _stLine = if c == '\n' then _stLine + 1 else _stLine
-              , _stCol = if c == '\n' then 1 else _stCol + 1
-              }
-            else
-              raiseError env st err $ EUnexpected $ show c
-          | c == '\0' && _stOff >= _envEnd env -> err st
-          | otherwise -> raiseError env st err EInvalidUtf8
+    if | (c, w) <- charAt @k (_envBuf env) _stOff,
+         c /= '\0' ->
+           if f c then
+             ok c st
+             { _stOff = _stOff + w
+             , _stLine = if c == '\n' then _stLine + 1 else _stLine
+             , _stCol = if c == '\n' then 1 else _stCol + 1
+             }
+           else
+             raiseError env st err $ EUnexpected $ show c
+       | _stOff >= _envEnd env ->
+           raiseError env st err $ EUnexpected "end of file"
+       | otherwise ->
+           raiseError env st err EInvalidUtf8
   {-# INLINE satisfy #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
@@ -255,14 +261,18 @@ instance CharChunk k => CharParser k (Reporter k) where
 
   asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
-    in if | b /= 0, b < 128, f b ->
+    in if | b /= 0,
+            b < 128,
+            f b ->
               ok b st
               { _stOff = _stOff + 1
               , _stLine = if b == asc_newline then _stLine + 1 else _stLine
               , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
-          | _stOff >= _envEnd env -> err st
-          | otherwise -> raiseError env st err $ EUnexpected $ showByte b
+          | _stOff >= _envEnd env ->
+              raiseError env st err $ EUnexpected "end of file"
+          | otherwise ->
+              raiseError env st err $ EUnexpected $ showByte b
   {-# INLINE asciiSatisfy #-}
 
   asciiByte b = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->

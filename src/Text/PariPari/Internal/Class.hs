@@ -20,8 +20,7 @@ import Text.PariPari.Internal.Chunk
 
 -- | Parsing errors
 data Error
-  = EEmpty
-  | EInvalidUtf8
+  = EInvalidUtf8
   | EExpectedEnd
   | EExpected         [String]
   | EUnexpected       String
@@ -112,7 +111,6 @@ class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
 
 -- | Pretty string representation of 'Error'
 showError :: Error -> String
-showError EEmpty                   = "No error"
 showError EInvalidUtf8             = "Invalid UTF-8 character found"
 showError EExpectedEnd             = "Expected end of file"
 showError (EExpected tokens)       = "Expected " <> intercalate ", " tokens

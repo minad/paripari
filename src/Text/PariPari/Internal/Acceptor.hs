@@ -78,7 +78,7 @@ instance Chunk k => Applicative (Acceptor k) where
   {-# INLINE (<*) #-}
 
 instance Chunk k => Alternative (Acceptor k) where
-  empty = Acceptor $ \_ _ _ err -> err EEmpty
+  empty = Acceptor $ \_ _ _ err -> err $ ECombinator "empty"
   {-# INLINE empty #-}
 
   p1 <|> p2 = Acceptor $ \env st ok err ->
@@ -145,8 +145,9 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   {-# INLINE commit #-}
 
   element e = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    if | _stOff >= _envEnd env -> err EEmpty
-       | (e', w) <- elementAt @k (_envBuf env) _stOff, e == e',
+    if | _stOff < _envEnd env,
+         (e', w) <- elementAt @k (_envBuf env) _stOff,
+         e == e',
          pos <- elementPos @k e (Pos _stLine _stCol) ->
            ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
        | otherwise ->
@@ -154,12 +155,13 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   {-# INLINE element #-}
 
   elementSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let (e, w) = elementAt @k (_envBuf env) _stOff
-    in if | _stOff >= _envEnd env -> err EEmpty
-          | f e, pos <- elementPos @k e (Pos _stLine _stCol) ->
-              ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
-          | otherwise ->
-              err $ ECombinator "elementSatisfy"
+    if | _stOff < _envEnd env,
+         (e, w) <- elementAt @k (_envBuf env) _stOff,
+         f e,
+         pos <- elementPos @k e (Pos _stLine _stCol) ->
+           ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+       | otherwise ->
+           err $ ECombinator "elementSatisfy"
   {-# INLINE elementSatisfy #-}
 
   chunk k = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
@@ -181,18 +183,16 @@ instance Chunk k => ChunkParser k (Acceptor k) where
 
 instance CharChunk k => CharParser k (Acceptor k) where
   satisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let (c, w) = charAt @k (_envBuf env) _stOff
-    in if | c /= '\0' ->
-            if f c then
-              ok c st
-              { _stOff = _stOff + w
-              , _stLine = if c == '\n' then _stLine + 1 else _stLine
-              , _stCol = if c == '\n' then 1 else _stCol + 1
-              }
-            else
-              err $ ECombinator "satisfy"
-          | c == '\0' && _stOff >= _envEnd env -> err EEmpty
-          | otherwise -> err $ ECombinator "satisfy"
+    if | (c, w) <- charAt @k (_envBuf env) _stOff,
+         c /= '\0',
+         f c ->
+           ok c st
+           { _stOff = _stOff + w
+           , _stLine = if c == '\n' then _stLine + 1 else _stLine
+           , _stCol = if c == '\n' then 1 else _stCol + 1
+           }
+       | otherwise ->
+           err $ ECombinator "satisfy"
   {-# INLINE satisfy #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
@@ -211,26 +211,28 @@ instance CharChunk k => CharParser k (Acceptor k) where
   {-# INLINE char #-}
 
   asciiSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-    let b = byteAt @k (_envBuf env) _stOff
-    in if | b /= 0, b < 128, f b ->
-              ok b st
-              { _stOff = _stOff + 1
-              , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b == asc_newline then 1 else _stCol + 1
-              }
-          | _stOff >= _envEnd env -> err EEmpty
-          | otherwise -> err $ ECombinator "satisfy"
+    if | b <- byteAt @k (_envBuf env) _stOff,
+         b /= 0,
+         b < 128,
+         f b ->
+           ok b st
+           { _stOff = _stOff + 1
+           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
+           , _stCol = if b == asc_newline then 1 else _stCol + 1
+           }
+       | otherwise ->
+           err $ ECombinator "asciiSatisfy"
   {-# INLINE asciiSatisfy #-}
 
   asciiByte b = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if byteAt @k (_envBuf env) _stOff == b then
+    if byteAt @k (_envBuf env) _stOff == b then
         ok b st
         { _stOff = _stOff + 1
         , _stLine = if b == asc_newline then _stLine + 1 else _stLine
         , _stCol = if b == asc_newline then 1 else _stCol + 1
         }
       else
-        err $ ECombinator "char"
+        err $ ECombinator "asciiByte"
   {-# INLINE asciiByte #-}
 
 -- | Reader monad, get something from the environment
