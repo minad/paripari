@@ -21,10 +21,14 @@ module Text.PariPari (
   , A.runAcceptor
 
   , R.Reporter
+  , R.Report(..)
+  , R.ErrorContext(..)
+  , R.ReportOptions(..)
   , R.runReporter
   , R.showReport
   , R.showErrors
   , R.runReporterWithOptions
+  , R.defaultReportOptions
 
   , T.Tracer
   , T.runTracer
