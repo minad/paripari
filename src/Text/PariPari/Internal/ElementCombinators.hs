@@ -6,7 +6,6 @@ module Text.PariPari.Internal.ElementCombinators (
   void
   , (<|>)
   , empty
-  , optional
 
   -- * Control.Monad.Combinators.NonEmpty
   , ON.some
@@ -16,6 +15,7 @@ module Text.PariPari.Internal.ElementCombinators (
   , ON.sepEndBy1
 
   -- * Control.Monad.Combinators
+  , O.optional -- dont use Applicative version for efficiency
   , O.many -- dont use Applicative version for efficiency
   , O.between
   , O.choice
@@ -56,7 +56,7 @@ module Text.PariPari.Internal.ElementCombinators (
   , takeElementsWhile1
 ) where
 
-import Control.Applicative ((<|>), empty, optional)
+import Control.Applicative ((<|>), empty)
 import Control.Monad (when)
 import Control.Monad.Combinators (skipCount, skipMany)
 import Data.Functor (void)

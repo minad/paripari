@@ -15,6 +15,7 @@ import Test.Tasty.HUnit
 import Text.PariPari
 import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
+import qualified Data.List.NonEmpty as NE
 
 main :: IO ()
 main = defaultMain tests
@@ -385,6 +386,25 @@ chunkTests run =
         err (empty :: p ()) "abc"
         err (empty :: p ()) ""
     ]
+
+  , testGroup "Basic Combinators"
+    [ testCase "optional" $ do
+        ok (optional (element 'a')) "abc" (Just 'a')
+        ok (optional (element 'b')) "abc" Nothing
+        ok (optional (element 'a')) "" Nothing
+
+    , testCase "some" $ do
+        ok (some (element 'a')) "abc" (NE.fromList "a")
+        ok (some (element 'a')) "aabc" (NE.fromList "aa")
+        err (some (element 'b')) "abc"
+        err (some (element 'a')) ""
+
+    , testCase "many" $ do
+        ok (many (element 'a')) "abc" "a"
+        ok (many (element 'a')) "aabc" "aa"
+        ok (many (element 'b')) "abc" ""
+        ok (many (element 'a')) "" ""
+    ]
   ]
   where
   ok :: (Eq a, Show a, HasCallStack) => p a -> Text -> a -> Assertion
@@ -402,16 +422,14 @@ Applicative
 Monad
 MonadPlus
 Alternative:
-optional
-some
 
 TODO:
 
+Additional combinators:
 endBy1
 someTill
 sepBy1
 sepEndBy1
-many
 between
 choice
 count
@@ -428,18 +446,25 @@ skipCount
 skipManyTill
 skipSomeTill
 
+Identation:
 align
 indented
 line
 linefold
+
+Fraction:
 fractionHex
 fractionDec
+
+Char Combinators:
 skipChars
 takeChars
 skipCharsWhile
 takeCharsWhile
 skipCharsWhile1
 takeCharsWhile1
+
+Element Combinators:
 takeElements
 skipElements
 skipElementsWhile
