@@ -1,56 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-module Text.PariPari.Combinators (
-  -- * Basic combinators
-  void
-  , (<|>)
-  , empty
-  , optional
-
-  -- * Control.Monad.Combinators.NonEmpty
-  , ON.some
-  , ON.endBy1
-  , ON.someTill
-  , ON.sepBy1
-  , ON.sepEndBy1
-
-  -- * Control.Monad.Combinators
-  , O.many -- dont use Applicative version for efficiency
-  , O.between
-  , O.choice
-  , O.count
-  , O.count'
-  , O.eitherP
-  , O.endBy
-  , O.manyTill
-  , O.option
-  , O.sepBy
-  , O.sepEndBy
-  , O.skipMany
-  , O.skipSome
-  , O.skipCount
-  , O.skipManyTill
-  , O.skipSomeTill
-
-  -- * PariPari
-  , (<?>)
-  , getLine
-  , getColumn
-  , withPos
-  , withSpan
-  , getRefColumn
-  , getRefLine
-  , withRefPos
-  , align
-  , indented
-  , line
-  , linefold
-  , notElement
-  , anyElement
-  , digitByte
-  , asciiByte
+module Text.PariPari.Internal.CharCombinators (
+  digitByte
   , integer
   , integer'
   , decimal
@@ -79,115 +30,20 @@ module Text.PariPari.Combinators (
   , takeCharsWhile
   , skipCharsWhile1
   , takeCharsWhile1
-  , takeElements
-  , skipElements
-  , skipElementsWhile
-  , takeElementsWhile
-  , skipElementsWhile1
-  , takeElementsWhile1
   , string
 ) where
 
-import Control.Applicative ((<|>), empty, optional)
-import Control.Monad (when)
+import Control.Applicative ((<|>), optional)
 import Control.Monad.Combinators (option, skipCount, skipMany)
-import Text.PariPari.Internal
-import Text.PariPari.Class
+import Text.PariPari.Internal.Chunk
+import Text.PariPari.Internal.Class
+import Text.PariPari.Internal.ElementCombinators ((<?>))
 import Data.Text (Text)
 import Data.Functor (void)
 import Data.Word (Word8)
-import Prelude hiding (getLine)
-import qualified Control.Monad.Combinators as O
-import qualified Control.Monad.Combinators.NonEmpty as ON
 import qualified Data.Char as C
 
-type ChunkP k a = (forall p. ChunkParser k p => p a)
 type CharP k a  = (forall p. CharParser k p => p a)
-
--- | Infix alias for 'label'
-(<?>) :: ChunkParser k p => p a -> String -> p a
-(<?>) = flip label
-{-# INLINE (<?>) #-}
-infix 0 <?>
-
--- | Get line number of the reference position
-getRefLine :: ChunkP k Int
-getRefLine = _posLine <$> getRefPos
-{-# INLINE getRefLine #-}
-
--- | Get column number of the reference position
-getRefColumn :: ChunkP k Int
-getRefColumn = _posColumn <$> getRefPos
-{-# INLINE getRefColumn #-}
-
--- | Get current line number
-getLine :: ChunkP k Int
-getLine = _posLine <$> getPos
-{-# INLINE getLine #-}
-
--- | Get current column
-getColumn :: ChunkP k Int
-getColumn = _posColumn <$> getPos
-{-# INLINE getColumn #-}
-
--- | Decorate the parser result with the current position
-withPos :: ChunkParser k p => p a -> p (Pos, a)
-withPos p = do
-  pos <- getPos
-  ret <- p
-  pure (pos, ret)
-{-# INLINE withPos #-}
-
-type Span = (Pos, Pos)
-
--- | Decoreate the parser result with the position span
-withSpan :: ChunkParser k p => p a -> p (Span, a)
-withSpan p = do
-  begin <- getPos
-  ret <- p
-  end <- getPos
-  pure ((begin, end), ret)
-{-# INLINE withSpan #-}
-
--- | Parser succeeds on the same line as the reference line
-line :: ChunkP k ()
-line = do
-  l <- getLine
-  rl <- getRefLine
-  when (l /= rl) $ failWith $ EIndentOverLine rl l
-{-# INLINE line #-}
-
--- | Parser succeeds on the same column as the reference column
-align :: ChunkP k ()
-align = do
-  c <- getColumn
-  rc <- getRefColumn
-  when (c /= rc) $ failWith $ EIndentNotAligned rc c
-{-# INLINE align #-}
-
--- | Parser succeeds for columns greater than the current reference column
-indented :: ChunkP k ()
-indented = do
-  c <- getColumn
-  rc <- getRefColumn
-  when (c <= rc) $ failWith $ ENotEnoughIndent rc c
-{-# INLINE indented #-}
-
--- | Parser succeeds either on the reference line or
--- for columns greater than the current reference column
-linefold :: ChunkP k ()
-linefold = line <|> indented
-{-# INLINE linefold #-}
-
--- | Parser a single byte different from the given one
-notElement :: forall k p. ChunkParser k p => Element k -> p (Element k)
-notElement e = elementSatisfy @k (/= e) <?> "not " <> showElement @k e
-{-# INLINE notElement #-}
-
--- | Parse an arbitrary byte
-anyElement :: ChunkP k (Element k)
-anyElement = elementSatisfy (const True)
-{-# INLINE anyElement #-}
 
 -- | Parse a digit byte for the given base.
 -- Bases 2 to 36 are supported.
@@ -201,7 +57,7 @@ isDigit base b
   | base <= 36 = (b >= asc_0 && b <= asc_9)
                  || ((fromIntegral b :: Word) - fromIntegral asc_A) < fromIntegral (base - 10)
                  || ((fromIntegral b :: Word) - fromIntegral asc_a) < fromIntegral (base - 10)
-  |otherwise = error "Text.PariPari.Combinators.isDigit: Bases 2 to 36 are supported"
+  |otherwise = error "Text.PariPari.Internal.Combinators.isDigit: Bases 2 to 36 are supported"
 {-# INLINE isDigit #-}
 
 digitToInt :: Int -> Word8 -> Word
@@ -373,36 +229,6 @@ untitle (x:xs) = C.toLower x : go xs
   where go [] = ""
         go (y:ys) | C.isUpper y = ' ' : C.toLower y : untitle ys
                   | otherwise   = y : ys
-
--- | Skip the next n elements
-skipElements :: ChunkParser k p => Int -> p ()
-skipElements n = skipCount n anyElement
-{-# INLINE skipElements #-}
-
--- | Take the next n elements and advance the position by n
-takeElements :: ChunkParser k p => Int -> p k
-takeElements n = asChunk (skipElements n) <?> show n <> " elements"
-{-# INLINE takeElements #-}
-
--- | Skip elements while predicate is true
-skipElementsWhile :: ChunkParser k p => (Element k -> Bool) -> p ()
-skipElementsWhile f = skipMany (elementSatisfy f)
-{-# INLINE skipElementsWhile #-}
-
--- | Takes elements while predicate is true
-takeElementsWhile :: ChunkParser k p => (Element k -> Bool) -> p k
-takeElementsWhile f = asChunk (skipElementsWhile f)
-{-# INLINE takeElementsWhile #-}
-
--- | Skip at least one element while predicate is true
-skipElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p ()
-skipElementsWhile1 f = elementSatisfy f *> skipElementsWhile f
-{-# INLINE skipElementsWhile1 #-}
-
--- | Take at least one element while predicate is true
-takeElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p k
-takeElementsWhile1 f = asChunk (skipElementsWhile1 f)
-{-# INLINE takeElementsWhile1 #-}
 
 -- | Skip the next n characters
 skipChars :: CharParser k p => Int -> p ()

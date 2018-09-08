@@ -1,9 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
-module Text.PariPari.Class (
+module Text.PariPari.Internal.Class (
   ChunkParser(..)
-  , Chunk(Element, showElement, showChunk)
-  , CharChunk
   , CharParser(..)
   , Alternative(..)
   , MonadPlus
@@ -18,7 +16,7 @@ import Control.Monad.Fail (MonadFail(..))
 import Data.List (intercalate)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
-import Text.PariPari.Internal
+import Text.PariPari.Internal.Chunk
 
 -- | Parsing errors
 data Error

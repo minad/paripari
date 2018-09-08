@@ -13,7 +13,7 @@ import Prelude hiding (getLine)
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.PariPari
-import Text.PariPari.Internal (textToChunk, asc_a, asc_0)
+import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0)
 import qualified Data.Char as C
 
 main :: IO ()

@@ -1,15 +1,19 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
-module Text.PariPari.Reporter (
-  Reporter
+module Text.PariPari.Internal.Reporter (
+  Reporter(..)
+  , Env(..)
+  , State(..)
+  , local
+  , get
+  , raiseError
+  , mergeErrorState
   , Report(..)
   , runReporter
   , runReporterWithOptions
@@ -18,18 +22,15 @@ module Text.PariPari.Reporter (
   , showErrors
   , ReportOptions(..)
   , defaultReportOptions
-  , Tracer
-  , runTracer
 ) where
 
 import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
-import Debug.Trace (trace)
 import GHC.Generics (Generic)
-import Text.PariPari.Internal
-import Text.PariPari.Class
+import Text.PariPari.Internal.Chunk
+import Text.PariPari.Internal.Class
 import qualified Control.Monad.Fail as Fail
 import qualified Data.List.NonEmpty as NE
 
@@ -124,7 +125,7 @@ instance Chunk k => Alternative (Reporter k) where
   {-# INLINE empty #-}
 
   p1 <|> p2 = Reporter $ \env st ok err ->
-    let err' s = unReporter p2 env (mergeStateErrors env st s) ok err
+    let err' s = unReporter p2 env (mergeErrorState env st s) ok err
     in unReporter p1 env st ok err'
   {-# INLINE (<|>) #-}
 
@@ -324,8 +325,8 @@ mkError env e
 {-# INLINE mkError #-}
 
 -- | Merge errors of two states, used when backtracking
-mergeStateErrors :: Env k -> State -> State -> State
-mergeStateErrors env s s'
+mergeErrorState :: Env k -> State -> State -> State
+mergeErrorState env s s'
   | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
@@ -336,7 +337,7 @@ mergeStateErrors env s s'
   | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
       s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
   | otherwise = s
-{-# INLINE mergeStateErrors #-}
+{-# INLINE mergeErrorState #-}
 
 groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
 groupOn f = NE.groupBy ((==) `on` f)
@@ -409,11 +410,6 @@ initialState _stOff = State
   , _stErrors    = []
   }
 
--- | Run 'Tracer' on the given 'ByteString', returning either
--- an error 'Report' or, if successful, the result.
-runTracer :: Chunk k => Tracer k a -> FilePath -> k -> Either Report a
-runTracer = runReporter . unTracer
-
 -- | Pretty string representation of 'Report'.
 showReport :: Report -> String
 showReport r =
@@ -435,25 +431,3 @@ showErrorContext ec =
 showContext :: [String] -> String
 showContext [] = ""
 showContext xs = " in context of " <> intercalate ", " xs
-
--- | Parser which prints trace messages, when backtracking occurs.
-newtype Tracer k a = Tracer { unTracer :: Reporter k a }
-  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
-
-deriving instance CharChunk k => ChunkParser k (Tracer k)
-deriving instance CharChunk k => CharParser k (Tracer k)
-
-instance Chunk k => Alternative (Tracer k) where
-  empty = Tracer empty
-
-  p1 <|> p2 = Tracer $ Reporter $ \env st ok err ->
-    let err' s =
-          let width = _stOff s -_stOff st
-              next  = unReporter (unTracer p2) env (mergeStateErrors env st s) ok err
-          in if width > 1 then
-               trace ("Back tracking " <> show width <> " bytes at line " <> show (_stLine s)
-                       <> ", column " <> show (_stCol s) <> ", context " <> show (_envContext env) <> ": "
-                       <> showChunk (packChunk @k (_envBuf env) (_stOff st) width)) next
-             else
-               next
-    in unReporter (unTracer p1) env st ok err'

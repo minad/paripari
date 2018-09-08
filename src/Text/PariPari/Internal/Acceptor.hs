@@ -5,14 +5,18 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Text.PariPari.Acceptor (
-  Acceptor
+module Text.PariPari.Internal.Acceptor (
+  Acceptor(..)
+  , Env(..)
+  , State(..)
+  , get
+  , local
   , runAcceptor
 ) where
 
 import Control.Monad (void)
-import Text.PariPari.Class
-import Text.PariPari.Internal
+import Text.PariPari.Internal.Class
+import Text.PariPari.Internal.Chunk
 import qualified Control.Monad.Fail as Fail
 
 data Env k = Env

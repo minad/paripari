@@ -2,7 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-module Text.PariPari.Internal (
+module Text.PariPari.Internal.Chunk (
   Chunk(..)
   , CharChunk(..)
   , Pos(..)
