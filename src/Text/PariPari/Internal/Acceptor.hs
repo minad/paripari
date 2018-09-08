@@ -132,7 +132,7 @@ instance Chunk k => ChunkParser k (Acceptor k) where
     if _stOff st >= _envEnd env then
       ok () st
     else
-      err EExpectedEnd
+      err expectedEnd
   {-# INLINE eof #-}
 
   label _ p = p

@@ -8,6 +8,8 @@ module Text.PariPari.Internal.Class (
   , Pos(..)
   , Error(..)
   , showError
+  , expectedEnd
+  , unexpectedEnd
 ) where
 
 import Control.Applicative (Alternative(empty, (<|>)))
@@ -21,7 +23,6 @@ import Text.PariPari.Internal.Chunk
 -- | Parsing errors
 data Error
   = EInvalidUtf8
-  | EExpectedEnd
   | EExpected         [String]
   | EUnexpected       String
   | EFail             String
@@ -112,7 +113,6 @@ class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
 -- | Pretty string representation of 'Error'
 showError :: Error -> String
 showError EInvalidUtf8             = "Invalid UTF-8 character found"
-showError EExpectedEnd             = "Expected end of file"
 showError (EExpected tokens)       = "Expected " <> intercalate ", " tokens
 showError (EUnexpected token)      = "Unexpected " <> token
 showError (EFail msg)              = msg
@@ -120,3 +120,9 @@ showError (ECombinator name)       = "Combinator " <> name <> " failed"
 showError (EIndentNotAligned rc c) = "Invalid alignment, expected column " <> show rc <> " expected, got " <> show c
 showError (EIndentOverLine   rl l) = "Indentation over line, expected line " <> show rl <> ", got " <> show l
 showError (ENotEnoughIndent  rc c) = "Not enough indentation, expected column " <> show rc <> ", got " <> show c
+
+expectedEnd :: Error
+expectedEnd = EExpected ["end of file"]
+
+unexpectedEnd :: Error
+unexpectedEnd = EUnexpected "end of file"

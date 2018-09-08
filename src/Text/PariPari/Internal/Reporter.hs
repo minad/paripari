@@ -184,7 +184,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
     if _stOff st >= _envEnd env then
       ok () st
     else
-      raiseError env st err EExpectedEnd
+      raiseError env st err expectedEnd
   {-# INLINE eof #-}
 
   element e = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
@@ -200,7 +200,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
   elementSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let (e, w) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env ->
-              raiseError env st err $ EUnexpected "end of file"
+              raiseError env st err unexpectedEnd
           | _stOff < _envEnd env,
             f e,
             pos <- elementPos @k e (Pos _stLine _stCol) ->
@@ -239,7 +239,7 @@ instance CharChunk k => CharParser k (Reporter k) where
            else
              raiseError env st err $ EUnexpected $ show c
        | _stOff >= _envEnd env ->
-           raiseError env st err $ EUnexpected "end of file"
+           raiseError env st err unexpectedEnd
        | otherwise ->
            raiseError env st err EInvalidUtf8
   {-# INLINE satisfy #-}
@@ -270,7 +270,7 @@ instance CharChunk k => CharParser k (Reporter k) where
               , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
           | _stOff >= _envEnd env ->
-              raiseError env st err $ EUnexpected "end of file"
+              raiseError env st err unexpectedEnd
           | otherwise ->
               raiseError env st err $ EUnexpected $ showByte b
   {-# INLINE asciiSatisfy #-}
