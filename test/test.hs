@@ -50,6 +50,10 @@ charTests run =
         err (satisfy (== 'b')) "abc"
         err (satisfy (== 'a')) ""
 
+        -- because of sentinel
+        err (satisfy (== '\0')) "\0"
+        err (satisfy (== '\0')) ""
+
     , testCase "char" $ do
         ok (char 'a') "abc" 'a'
         ok (char 'a' <* eof) "a" 'a'
@@ -61,6 +65,10 @@ charTests run =
         ok (asciiSatisfy (== asc_a) <* eof) "a" asc_a
         err (asciiSatisfy (== asc_0)) "abc"
         err (asciiSatisfy (== asc_0)) ""
+
+        -- because of sentinel
+        err (asciiSatisfy (== 0)) "\0"
+        err (asciiSatisfy (== 0)) ""
 
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
@@ -304,11 +312,21 @@ chunkTests run =
         err (elementSatisfy (== 'b')) "abc"
         err (elementSatisfy (== 'a')) ""
 
+        -- sentinel
+        ok (elementSatisfy (== '\0')) "\0" '\0'
+        ok (elementSatisfy (== '\0') <* eof) "\0" '\0'
+        err (elementSatisfy (== '\0')) ""
+
     , testCase "element" $ do
         ok (element 'a') "abc" 'a'
         ok (element 'a' <* eof) "a" 'a'
         err (element 'b') "abc"
         err (element 'a') ""
+
+        -- sentinel
+        ok (element '\0') "\0" '\0'
+        ok (element '\0' <* eof) "\0" '\0'
+        err (element '\0') ""
 
     , testCase "chunk" $ do
         ok (chunk "ab") "abc" "ab"

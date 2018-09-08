@@ -246,17 +246,18 @@ instance CharChunk k => CharParser k (Reporter k) where
 
   -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimised decoder.
-  char c =
-    let w = charWidth @k c
-    in Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if charAtFixed @k w (_envBuf env) _stOff == c then
-        ok c st
-        { _stOff = _stOff + w
-        , _stLine = if c == '\n' then _stLine + 1 else _stLine
-        , _stCol = if c == '\n' then 1 else _stCol + 1
-        }
-      else
-        raiseError env st err $ EExpected [show c]
+  char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
+  char c
+    | w <- charWidth @k c =
+        Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        if charAtFixed @k w (_envBuf env) _stOff == c then
+          ok c st
+          { _stOff = _stOff + w
+          , _stLine = if c == '\n' then _stLine + 1 else _stLine
+          , _stCol = if c == '\n' then 1 else _stCol + 1
+          }
+        else
+          raiseError env st err $ EExpected [show c]
   {-# INLINE char #-}
 
   asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
@@ -275,15 +276,18 @@ instance CharChunk k => CharParser k (Reporter k) where
               raiseError env st err $ EUnexpected $ showByte b
   {-# INLINE asciiSatisfy #-}
 
-  asciiByte b = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
-      if byteAt @k (_envBuf env) _stOff == b then
-        ok b st
-        { _stOff = _stOff + 1
-        , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-        , _stCol = if b == asc_newline then 1 else _stCol + 1
-        }
-      else
-        raiseError env st err $ EExpected [showByte b]
+  asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
+  asciiByte b
+    | b >= 128 = error "Not an ASCII character"
+    | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        if byteAt @k (_envBuf env) _stOff == b then
+          ok b st
+          { _stOff = _stOff + 1
+          , _stLine = if b == asc_newline then _stLine + 1 else _stLine
+          , _stCol = if b == asc_newline then 1 else _stCol + 1
+          }
+        else
+          raiseError env st err $ EExpected [showByte b]
   {-# INLINE asciiByte #-}
 
 raiseError :: Env k -> State -> (State -> b) -> Error -> b
