@@ -178,30 +178,32 @@ charTests run =
   , testGroup "Fraction Combinators"
     [ testCase "fraction" $ do
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "1.23" (123, 10, -2)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "99e0" (99, 10, 0)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "123.45" (12345, 10, -2)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "00123." (123, 10, 0)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "456.000" (456000, 10, -3)
 
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e-5" (987, 10, -5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e-5" (987, 10, -5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e-7" (987654, 10, -10)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e-123" (987, 10, -123)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e-67" (987654, 10, -70)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e-7" (987654000, 10, -13)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e-7" (987654000, 10, -13)
 
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e+5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e+5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e+7" (987654, 10, 4)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e+123" (987, 10, 123)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e+67" (987654, 10, 64)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e+7" (987654000, 10, 1)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e+7" (987654000, 10, 1)
 
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e7" (987654, 10, 4)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e123" (987, 10, 123)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e67" (987654, 10, 64)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e7" (987654000, 10, 1)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e7" (987654000, 10, 1)
 
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "00123." (123, 10, 0)
         err @(Integer, Int, Integer) (fractionDec (pure ())) ""
         err @(Integer, Int, Integer) (fractionDec (pure ())) "123"
+        err @(Integer, Int, Integer) (fractionDec (pure ())) "123e"
         err @(Integer, Int, Integer) (fractionDec (pure ())) "abc"
     ]
 
