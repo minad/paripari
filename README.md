@@ -24,9 +24,9 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Backtracking by default for ease of use
 * `commit` combinator to improve error messages by committing to branches
 * Tracing parser to analyze backtracking
-* ByteStrings can be parsed as UTF-8
+* Support for strict UTF-8 `ByteString` and strict `Text`
 * Combinators for indentation-sensitive parsing
-* Most Parsec/Megaparsec combinators provided, relying on parser-combinators
+* Most Parsec/Megaparsec combinators provided, relying on the `parser-combinators` library
 
 ## Example
 
@@ -38,8 +38,8 @@ We specify a preprocessor, language pragmas and the library imports.
 Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
 GHC specialiser does not kick in. As a workaround we use `paripari-specialise-all` as a
-preprocessor, which processes our custom `SPECIALISE_ALL` pragmas. Using the preprocessor
-is not necessary, however without it I observed 2x-4x slowdowns in parsing speed.
+preprocessor, which generates `SPECIALISE` pragmas from our custom `SPECIALISE_ALL` pragma.
+Using the preprocessor is not necessary, however without it I observed 2x-4x slowdowns in parsing speed.
 
 ``` haskell
 {-# OPTIONS_GHC -F -pgmF paripari-specialise-all #-}
@@ -188,96 +188,125 @@ See the repository [parsers-bench](https://github.com/minad/parsers-bench/).
 parsers-bench-0.1.0: benchmarks
 Running 1 benchmarks...
 Benchmark bench-speed: RUNNING...
+benchmarking CSV (PariPari)/csv-40.csv
+time                 16.34 μs   (16.18 μs .. 16.53 μs)
+                     0.998 R²   (0.996 R² .. 0.999 R²)
+mean                 16.87 μs   (16.41 μs .. 18.64 μs)
+std dev              2.703 μs   (569.0 ns .. 5.580 μs)
+variance introduced by outliers: 94% (severely inflated)
+
+benchmarking CSV (PariPari, Reporter)/csv-40.csv
+time                 104.9 μs   (103.2 μs .. 106.5 μs)
+                     0.985 R²   (0.972 R² .. 0.992 R²)
+mean                 128.0 μs   (118.4 μs .. 140.0 μs)
+std dev              40.73 μs   (30.44 μs .. 51.00 μs)
+variance introduced by outliers: 98% (severely inflated)
+
 benchmarking CSV (Attoparsec)/csv-40.csv
-time                 59.43 μs   (56.72 μs .. 63.16 μs)
-                     0.986 R²   (0.973 R² .. 0.998 R²)
-mean                 57.45 μs   (56.46 μs .. 59.85 μs)
-std dev              4.854 μs   (2.479 μs .. 8.184 μs)
-variance introduced by outliers: 78% (severely inflated)
+time                 57.69 μs   (56.52 μs .. 60.22 μs)
+                     0.917 R²   (0.796 R² .. 0.988 R²)
+mean                 68.62 μs   (62.95 μs .. 81.74 μs)
+std dev              27.44 μs   (15.54 μs .. 49.65 μs)
+variance introduced by outliers: 99% (severely inflated)
 
 benchmarking CSV (Megaparsec)/csv-40.csv
-time                 52.52 μs   (51.95 μs .. 53.18 μs)
-                     0.999 R²   (0.998 R² .. 0.999 R²)
-mean                 53.07 μs   (52.55 μs .. 53.75 μs)
-std dev              1.993 μs   (1.391 μs .. 2.720 μs)
-variance introduced by outliers: 40% (moderately inflated)
-
-benchmarking CSV (PariPari)/csv-40.csv
-time                 16.82 μs   (16.27 μs .. 17.30 μs)
+time                 52.12 μs   (51.54 μs .. 52.98 μs)
                      0.996 R²   (0.993 R² .. 0.998 R²)
-mean                 16.51 μs   (16.25 μs .. 17.23 μs)
-std dev              1.334 μs   (669.5 ns .. 2.631 μs)
-variance introduced by outliers: 80% (severely inflated)
-
-benchmarking Log (Attoparsec)/log-40.log
-time                 373.1 μs   (368.2 μs .. 377.7 μs)
-                     0.998 R²   (0.996 R² .. 0.999 R²)
-mean                 375.4 μs   (371.1 μs .. 384.0 μs)
-std dev              18.81 μs   (8.297 μs .. 30.52 μs)
-variance introduced by outliers: 45% (moderately inflated)
-
-benchmarking Log (Megaparsec)/log-40.log
-time                 435.7 μs   (418.4 μs .. 453.0 μs)
-                     0.993 R²   (0.990 R² .. 0.999 R²)
-mean                 420.6 μs   (415.5 μs .. 429.3 μs)
-std dev              23.58 μs   (16.95 μs .. 32.19 μs)
-variance introduced by outliers: 51% (severely inflated)
+mean                 54.34 μs   (53.25 μs .. 56.03 μs)
+std dev              4.705 μs   (3.416 μs .. 6.766 μs)
+variance introduced by outliers: 79% (severely inflated)
 
 benchmarking Log (PariPari)/log-40.log
-time                 364.2 μs   (358.8 μs .. 370.6 μs)
-                     0.998 R²   (0.996 R² .. 0.999 R²)
-mean                 364.8 μs   (359.9 μs .. 375.8 μs)
-std dev              24.02 μs   (11.61 μs .. 44.68 μs)
-variance introduced by outliers: 60% (severely inflated)
-
-benchmarking JSON (Attoparsec)/json-40.json
-time                 22.06 μs   (21.70 μs .. 22.42 μs)
-                     0.998 R²   (0.996 R² .. 0.999 R²)
-mean                 22.04 μs   (21.81 μs .. 22.61 μs)
-std dev              1.122 μs   (592.0 ns .. 2.044 μs)
-variance introduced by outliers: 59% (severely inflated)
-
-benchmarking JSON (Megaparsec)/json-40.json
-time                 30.40 μs   (29.94 μs .. 30.88 μs)
+time                 364.4 μs   (359.8 μs .. 369.6 μs)
                      0.998 R²   (0.997 R² .. 0.999 R²)
-mean                 30.32 μs   (30.07 μs .. 30.69 μs)
-std dev              1.014 μs   (721.0 ns .. 1.466 μs)
-variance introduced by outliers: 37% (moderately inflated)
+mean                 362.3 μs   (359.7 μs .. 365.9 μs)
+std dev              10.50 μs   (7.760 μs .. 14.60 μs)
+variance introduced by outliers: 22% (moderately inflated)
 
-benchmarking JSON (PariPari)/json-40.json
-time                 20.44 μs   (20.08 μs .. 20.84 μs)
-                     0.997 R²   (0.995 R² .. 0.999 R²)
-mean                 20.31 μs   (20.10 μs .. 20.66 μs)
-std dev              844.7 ns   (535.8 ns .. 1.171 μs)
-variance introduced by outliers: 49% (moderately inflated)
-
-benchmarking JSON (AttoparsecHi)/json-40.json
-time                 34.27 μs   (33.85 μs .. 34.75 μs)
-                     0.997 R²   (0.995 R² .. 0.998 R²)
-mean                 35.27 μs   (34.41 μs .. 36.90 μs)
-std dev              3.985 μs   (2.088 μs .. 6.212 μs)
+benchmarking Log (PariPari, Reporter)/log-40.log
+time                 411.5 μs   (404.1 μs .. 421.8 μs)
+                     0.984 R²   (0.964 R² .. 0.996 R²)
+mean                 425.2 μs   (411.3 μs .. 453.2 μs)
+std dev              60.17 μs   (37.11 μs .. 88.14 μs)
 variance introduced by outliers: 87% (severely inflated)
 
-benchmarking JSON (MegaparsecHi)/json-40.json
-time                 55.94 μs   (55.21 μs .. 56.65 μs)
-                     0.999 R²   (0.997 R² .. 0.999 R²)
-mean                 55.61 μs   (55.08 μs .. 56.51 μs)
-std dev              2.164 μs   (1.247 μs .. 3.265 μs)
+benchmarking Log (Attoparsec)/log-40.log
+time                 368.6 μs   (364.2 μs .. 372.5 μs)
+                     0.998 R²   (0.997 R² .. 0.999 R²)
+mean                 364.6 μs   (360.9 μs .. 371.3 μs)
+std dev              16.87 μs   (10.96 μs .. 27.01 μs)
 variance introduced by outliers: 42% (moderately inflated)
 
-benchmarking JSON (PariPariHi)/json-40.json
-time                 31.46 μs   (31.03 μs .. 32.00 μs)
-                     0.996 R²   (0.993 R² .. 0.999 R²)
-mean                 32.75 μs   (32.05 μs .. 33.80 μs)
-std dev              2.862 μs   (2.049 μs .. 4.450 μs)
-variance introduced by outliers: 80% (severely inflated)
+benchmarking Log (Megaparsec)/log-40.log
+time                 412.4 μs   (405.9 μs .. 423.8 μs)
+                     0.992 R²   (0.982 R² .. 0.998 R²)
+mean                 419.7 μs   (410.9 μs .. 433.7 μs)
+std dev              34.86 μs   (21.22 μs .. 51.70 μs)
+variance introduced by outliers: 69% (severely inflated)
+
+benchmarking JSON (PariPari)/json-40.json
+time                 20.33 μs   (20.08 μs .. 20.68 μs)
+                     0.998 R²   (0.997 R² .. 1.000 R²)
+mean                 20.48 μs   (20.27 μs .. 21.02 μs)
+std dev              1.179 μs   (578.2 ns .. 2.199 μs)
+variance introduced by outliers: 65% (severely inflated)
+
+benchmarking JSON (PariPari, Reporter)/json-40.json
+time                 76.16 μs   (74.89 μs .. 78.25 μs)
+                     0.994 R²   (0.987 R² .. 0.999 R²)
+mean                 76.02 μs   (74.68 μs .. 78.57 μs)
+std dev              5.598 μs   (3.438 μs .. 8.326 μs)
+variance introduced by outliers: 72% (severely inflated)
+
+benchmarking JSON (Attoparsec)/json-40.json
+time                 21.67 μs   (21.43 μs .. 21.97 μs)
+                     0.999 R²   (0.998 R² .. 0.999 R²)
+mean                 21.69 μs   (21.48 μs .. 21.99 μs)
+std dev              836.0 ns   (554.7 ns .. 1.371 μs)
+variance introduced by outliers: 45% (moderately inflated)
+
+benchmarking JSON (Megaparsec)/json-40.json
+time                 31.50 μs   (30.84 μs .. 32.42 μs)
+                     0.994 R²   (0.989 R² .. 0.998 R²)
+mean                 31.45 μs   (30.88 μs .. 32.42 μs)
+std dev              2.377 μs   (1.554 μs .. 3.610 μs)
+variance introduced by outliers: 75% (severely inflated)
+
+benchmarking JSON (PariPari, highlevel)/json-40.json
+time                 30.63 μs   (30.08 μs .. 31.24 μs)
+                     0.998 R²   (0.996 R² .. 0.999 R²)
+mean                 30.69 μs   (30.35 μs .. 31.27 μs)
+std dev              1.459 μs   (1.056 μs .. 2.053 μs)
+variance introduced by outliers: 54% (severely inflated)
+
+benchmarking JSON (PariPari, Reporter, highlevel)/json-40.json
+time                 109.8 μs   (107.2 μs .. 113.2 μs)
+                     0.995 R²   (0.992 R² .. 0.998 R²)
+mean                 110.0 μs   (108.6 μs .. 112.2 μs)
+std dev              6.079 μs   (4.499 μs .. 7.572 μs)
+variance introduced by outliers: 57% (severely inflated)
+
+benchmarking JSON (Attoparsec, highlevel)/json-40.json
+time                 33.94 μs   (33.56 μs .. 34.39 μs)
+                     0.998 R²   (0.997 R² .. 0.999 R²)
+mean                 34.31 μs   (33.87 μs .. 35.74 μs)
+std dev              2.511 μs   (896.2 ns .. 5.032 μs)
+variance introduced by outliers: 74% (severely inflated)
+
+benchmarking JSON (Megaparsec, highlevel)/json-40.json
+time                 58.52 μs   (56.70 μs .. 60.51 μs)
+                     0.993 R²   (0.990 R² .. 0.998 R²)
+mean                 57.58 μs   (56.73 μs .. 58.92 μs)
+std dev              3.511 μs   (2.575 μs .. 4.710 μs)
+variance introduced by outliers: 64% (severely inflated)
 
 Benchmark bench-speed: FINISH
 ```
 
 ## Thanks
 
-* Mark Karpov @mrkkrp - For the parser-combinators library, which was extracted from megaparsec and parsers-bench.
+* Mark Karpov @mrkkrp - For the `parser-combinators` library,
+  which was extracted from Megaparsec and parsers-bench.
   The json example above is adapted from parsers-bench.
 
 ## Related projects

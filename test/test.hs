@@ -432,18 +432,19 @@ chunkTests run =
 
 
 {-
+TODO:
 
+Instances:
 Semigroup
 Monoid
 Functor
 Applicative
 Monad
 MonadPlus
-Alternative:
+Alternative
 
-TODO:
-
-Additional combinators:
+Additional combinators provided by parser-combinators.
+They are also tested by megaparsec:
 endBy1
 someTill
 sepBy1
