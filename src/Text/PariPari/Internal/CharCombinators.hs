@@ -35,12 +35,13 @@ module Text.PariPari.Internal.CharCombinators (
 
 import Control.Applicative ((<|>), optional)
 import Control.Monad.Combinators (option, skipCount, skipMany)
+import Data.Functor (void)
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import Data.Word (Word8)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.ElementCombinators ((<?>))
-import Data.Text (Text)
-import Data.Functor (void)
-import Data.Word (Word8)
 import qualified Data.Char as C
 
 type CharP k a  = (forall p. CharParser k p => p a)
@@ -128,21 +129,27 @@ signed p = ($) <$> ((id <$ asciiByte asc_plus) <|> (negate <$ asciiByte asc_minu
 
 -- | Parse a fraction of arbitrary exponent base and coefficient base.
 -- 'fractionDec' and 'fractionHex' should be used instead probably.
+-- Does not parse integers.
 fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
   coeff <- integer digitSep coeffBase
-  void $ optional $ asciiByte asc_point
-  (frac, fracLen) <- option (0, 0) $ integer' digitSep coeffBase
-  expVal <- option 0 $ expSep *> signed (integer digitSep 10)
-  pure (coeff * fromIntegral coeffBase ^ fracLen + frac,
-        expBase,
-        expVal - fromIntegral (fracLen * coeffBasePow))
+  frac <- optional $ asciiByte asc_point *> option (0, 0) (integer' digitSep coeffBase)
+  expn <- optional $ expSep *> signed (integer digitSep 10)
+  let (fracVal, fracLen) = fromMaybe (0, 0) frac
+      expVal = fromMaybe 0 expn
+  case (frac, expn) of
+    (Nothing, Nothing) -> failWith $ EExpected ["fraction"]
+    _  ->
+      pure (coeff * fromIntegral coeffBase ^ fracLen + fracVal,
+            expBase,
+            expVal - fromIntegral (fracLen * coeffBasePow))
 {-# INLINE fraction #-}
 
 -- | Parse a decimal fraction, returning (coefficient, 10, exponent),
 -- corresponding to coefficient * 10^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
+-- Does not parse integers.
 fractionDec :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
 fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
@@ -150,6 +157,7 @@ fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 
 -- | Parse a hexadecimal fraction, returning (coefficient, 2, exponent),
 -- corresponding to coefficient * 2^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
+-- Does not parse integers.
 fractionHex :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
 fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}

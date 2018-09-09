@@ -175,6 +175,36 @@ charTests run =
         err (digitByte 10) ""
     ]
 
+  , testGroup "Fraction Combinators"
+    [ testCase "fraction" $ do
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "1.23" (123, 10, -2)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "123.45" (12345, 10, -2)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "456.000" (456000, 10, -3)
+
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e-5" (987, 10, -5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e-5" (987, 10, -5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e-7" (987654, 10, -10)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e-7" (987654000, 10, -13)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e-7" (987654000, 10, -13)
+
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e+5" (987, 10, 5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e+5" (987, 10, 5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e+7" (987654, 10, 4)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e+7" (987654000, 10, 1)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e+7" (987654000, 10, 1)
+
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e5" (987, 10, 5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e5" (987, 10, 5)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e7" (987654, 10, 4)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e7" (987654000, 10, 1)
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e7" (987654000, 10, 1)
+
+        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "00123." (123, 10, 0)
+        err @(Integer, Int, Integer) (fractionDec (pure ())) ""
+        err @(Integer, Int, Integer) (fractionDec (pure ())) "123"
+        err @(Integer, Int, Integer) (fractionDec (pure ())) "abc"
+    ]
+
   , testGroup "Integer Combinators"
     [ testCase "decimal" $ do
         ok @Integer (decimal <* eof) "0123" 123
@@ -201,11 +231,11 @@ charTests run =
         err @Integer hexadecimal ""
 
     , testCase "integer" $ do
-        err @Integer (integer (pure ()) 10) "abc"
         ok @Integer (integer (char '_') 10) "1_2_3" 123
         ok @Integer (integer (char '_') 10 <* char '_') "1_2_3_" 123
-        err @Integer (integer (char '_') 10) "_1_2_3"
         ok @Integer (integer (optional $ char '_') 10) "123_456_789" 123456789
+        err @Integer (integer (pure ()) 10) "abc"
+        err @Integer (integer (char '_') 10) "_1_2_3"
         err @Integer (integer (pure ()) 10) "-1"
         err @Integer (integer (pure ()) 10) ""
 
@@ -214,13 +244,17 @@ charTests run =
         ok @Integer (integer (pure ()) 36) "XyZ" 44027
 
     , testCase "integer'" $ do
-        err @(Integer, Int) (integer' (pure ()) 10) "abc"
         ok @(Integer, Int) (integer' (char '_') 10) "1_2_3" (123, 3)
         ok @(Integer, Int) (integer' (char '_') 10 <* char '_') "1_2_3_" (123, 3)
-        err @(Integer, Int) (integer' (char '_') 10) "_1_2_3"
         ok @(Integer, Int) (integer' (optional $ char '_') 10) "123_456_789" (123456789, 9)
+        err @(Integer, Int) (integer' (pure ()) 10) "abc"
+        err @(Integer, Int) (integer' (char '_') 10) "_1_2_3"
         err @(Integer, Int) (integer' (pure ()) 10) "-1"
         err @(Integer, Int) (integer' (pure ()) 10) ""
+
+        ok @(Integer, Int) (integer' (pure ()) 10) "0123" (123, 4)
+        ok @(Integer, Int) (integer' (pure ()) 10) "01230" (1230, 5)
+        ok @(Integer, Int) (integer' (pure ()) 10) "000" (0, 3)
 
         ok @(Integer, Int) (integer' (pure ()) 2) "101" (5, 3)
         ok @(Integer, Int) (integer' (pure ()) 7) "321" (162, 3)
@@ -473,7 +507,6 @@ linefold
 
 Fraction:
 fractionHex
-fractionDec
 
 Char Combinators:
 skipChars

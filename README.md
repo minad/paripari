@@ -26,6 +26,8 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Tracing parser to analyze backtracking
 * Support for strict UTF-8 `ByteString` and strict `Text`
 * Combinators for indentation-sensitive parsing
+* Provides flexible parsers for integers and fractional numbers
+  of base 2 to 36 with support for separators between digits
 * Most Parsec/Megaparsec combinators provided, relying on the `parser-combinators` library
 
 ## Example
