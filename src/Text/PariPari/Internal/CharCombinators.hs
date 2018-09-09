@@ -78,6 +78,7 @@ digit base = digitToInt base <$> asciiSatisfy (isDigit base)
 -- Returns the integer and the number of digits.
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
+-- Signs are not parsed by this combinator.
 integer' :: (Num a, CharParser k p) => p sep -> Int -> p (a, Int)
 integer' sep base = label (integerLabel base) $ do
   d <- digit base
@@ -92,6 +93,7 @@ integer' sep base = label (integerLabel base) $ do
 -- | Parse an integer of the given base.
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
+-- Signs are not parsed by this combinator.
 integer :: (Num a, CharParser k p) => p sep -> Int -> p a
 integer sep base = label (integerLabel base) $ do
   d <- digit base
@@ -110,14 +112,20 @@ integerLabel 10 = "decimal integer"
 integerLabel 16 = "hexadecimal integer"
 integerLabel b  = "integer of base " <> show b
 
+-- | Parses a decimal integer.
+-- Signs are not parsed by this combinator.
 decimal :: Num a => CharP k a
 decimal = integer (pure ()) 10
 {-# INLINE decimal #-}
 
+-- | Parses an octal integer.
+-- Signs are not parsed by this combinator.
 octal :: Num a => CharP k a
 octal = integer (pure ()) 8
 {-# INLINE octal #-}
 
+-- | Parses a hexadecimal integer.
+-- Signs are not parsed by this combinator.
 hexadecimal :: Num a => CharP k a
 hexadecimal = integer (pure ()) 16
 {-# INLINE hexadecimal #-}
@@ -130,6 +138,7 @@ signed p = ($) <$> ((id <$ asciiByte asc_plus) <|> (negate <$ asciiByte asc_minu
 -- | Parse a fraction of arbitrary exponent base and coefficient base.
 -- 'fractionDec' and 'fractionHex' should be used instead probably.
 -- Does not parse integers.
+-- Signs are not parsed by this combinator.
 fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
 fraction expSep expBase coeffBasePow digitSep = do
   let coeffBase = expBase ^ coeffBasePow
@@ -150,6 +159,7 @@ fraction expSep expBase coeffBasePow digitSep = do
 -- corresponding to coefficient * 10^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Does not parse integers.
+-- Signs are not parsed by this combinator.
 fractionDec :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
 fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
@@ -158,6 +168,7 @@ fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 
 -- corresponding to coefficient * 2^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Does not parse integers.
+-- Signs are not parsed by this combinator.
 fractionHex :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
 fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
