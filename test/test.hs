@@ -5,20 +5,44 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Main (main) where
 
+import Control.Monad (replicateM, replicateM_)
 import Data.ByteString (ByteString)
 import Data.Either (isLeft)
 import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 import Prelude hiding (getLine)
+import System.Random
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.PariPari
 import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
+import qualified Data.Text as T
 
 main :: IO ()
 main = defaultMain tests
+
+randomTries :: Int
+randomTries = 1000
+
+randomStringLen :: Int
+randomStringLen = 1000
+
+randomString :: IO Text
+randomString = do
+  n <- randomRIO (1, randomStringLen)
+  T.pack <$> replicateM n (randomRIO (C.chr 1, maxBound))
+
+randomAsciiString :: IO Text
+randomAsciiString = do
+  n <- randomRIO (1, randomStringLen)
+  T.pack <$> replicateM n (randomRIO (C.chr 1, C.chr 127))
+
+loop :: Applicative f => (Char -> f a) -> Text -> f ()
+loop f s
+  | T.null s = pure ()
+  | otherwise = f (T.head s) *> loop f (T.tail s)
 
 tests :: TestTree
 tests = testGroup "Tests"
@@ -54,11 +78,19 @@ charTests run =
         err (satisfy (== '\0')) "\0"
         err (satisfy (== '\0')) ""
 
+    , testCase "satisfy-random" $ replicateM_ randomTries $ do
+        s <- randomString
+        ok (loop (satisfy . (==)) s *> eof) s ()
+
     , testCase "char" $ do
         ok (char 'a') "abc" 'a'
         ok (char 'a' <* eof) "a" 'a'
         err (char 'b') "abc"
         err (char 'a') ""
+
+    , testCase "char-random" $ replicateM_ randomTries $ do
+        s <- randomString
+        ok (loop char s *> eof) s ()
 
     , testCase "asciiSatisfy" $ do
         ok (asciiSatisfy (== asc_a)) "abc" asc_a
@@ -70,12 +102,20 @@ charTests run =
         err (asciiSatisfy (== 0)) "\0"
         err (asciiSatisfy (== 0)) ""
 
+    , testCase "asciiSatisfy-random" $ replicateM_ randomTries $ do
+        s <- randomAsciiString
+        ok (loop (asciiSatisfy . (==) . fromIntegral . C.ord) s *> eof) s ()
+
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
         ok (asciiByte asc_a <* eof) "a" asc_a
         ok (asciiByte 127 <* eof) "\x7F" 127
         err (asciiByte asc_0) "abc"
         err (asciiByte asc_0) ""
+
+    , testCase "asciiByte-random" $ replicateM_ randomTries $ do
+        s <- randomAsciiString
+        ok (loop (asciiByte . fromIntegral . C.ord) s *> eof) s ()
     ]
 
   , testGroup "Char Combinators"
@@ -84,10 +124,28 @@ charTests run =
         err (string "bc") "abc"
         err (string "ab") ""
 
+    , testCase "string-random" $ replicateM_ randomTries $ do
+        s <- randomString
+        ok (string s <* eof) s s
+
     , testCase "anyChar" $ do
         ok anyChar "abc" 'a'
         ok (anyChar <* eof) "a" 'a'
         err anyChar ""
+
+    , testCase "anyChar-random" $ replicateM_ randomTries $ do
+        s <- randomString
+        ok (loop (const anyChar) s *> eof) s ()
+
+    , testCase "anyAsciiByte" $ do
+        ok anyAsciiByte "abc" asc_a
+        ok (anyAsciiByte <* eof) "a" asc_a
+        err anyAsciiByte ""
+        err anyAsciiByte "\x80"
+
+    , testCase "anyAsciiByte-random" $ replicateM_ randomTries $ do
+        s <- randomAsciiString
+        ok (loop (const anyAsciiByte) s *> eof) s ()
 
     , testCase "notChar" $ do
         ok (notChar 'b') "abc" 'a'

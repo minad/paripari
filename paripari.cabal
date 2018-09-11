@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 87e979e4357c7d84248d0b5e5398fd5839dc2eab49edd049e3d16aa4cc392369
+-- hash: f48c025f1e1acf388478f31804c1453f1a62cece8e503743b2fc041478b8de09
 
 name:           paripari
 version:        0.2.0.0
@@ -87,6 +87,7 @@ test-suite test
     , bytestring >=0.10 && <0.11
     , paripari
     , parser-combinators >=1.0 && <1.1
+    , random
     , tasty
     , tasty-hunit
     , text >=0.11 && <1.3

@@ -14,6 +14,7 @@ module Text.PariPari.Internal.CharCombinators (
   , char'
   , notChar
   , anyChar
+  , anyAsciiByte
   , alphaNumChar
   , digitChar
   , letterChar
@@ -191,6 +192,11 @@ anyChar :: CharP k Char
 anyChar = satisfy (const True)
 {-# INLINE anyChar #-}
 
+-- | Parse an arbitrary ASCII byte.
+anyAsciiByte :: CharP k Word8
+anyAsciiByte = asciiSatisfy (const True)
+{-# INLINE anyAsciiByte #-}
+
 -- | Parse an alphanumeric character, including Unicode.
 alphaNumChar :: CharP k Char
 alphaNumChar = satisfy C.isAlphaNum <?> "alphanumeric character"
@@ -234,7 +240,7 @@ digitChar base = unsafeAsciiToChar <$> digitByte base
 
 -- | Parse a character beloning to the ASCII charset (< 128)
 asciiChar :: CharP k Char
-asciiChar = unsafeAsciiToChar <$> asciiSatisfy (const True)
+asciiChar = unsafeAsciiToChar <$> anyAsciiByte
 {-# INLINE asciiChar #-}
 
 -- | Parse a character belonging to the given Unicode category

@@ -45,6 +45,7 @@ tests:
     source-dirs:   test
     main:          test.hs
     dependencies:
+      - paripari
+      - random
       - tasty
       - tasty-hunit
-      - paripari
