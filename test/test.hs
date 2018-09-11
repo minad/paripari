@@ -229,7 +229,7 @@ charTests run =
     ]
 
   , testGroup "Fraction Combinators"
-    [ testCase "fraction" $ do
+    [ testCase "fractionDec" $ do
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "1.23" (123, 10, -2)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "99e0" (99, 10, 0)
         ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "123.45" (12345, 10, -2)
