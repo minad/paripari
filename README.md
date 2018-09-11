@@ -1,5 +1,8 @@
 # PariPari: Fast parser combinator library for Haskell
 
+[![Hackage](https://img.shields.io/hackage/v/paripari.svg)](https://hackage.haskell.org/package/paripari)
+[![Build Status](https://secure.travis-ci.org/minad/paripari.png?branch=master)](http://travis-ci.org/minad/paripari)
+
 PariPari is a parser combinator library for Haskell. PariPari can be used as
 a drop in replacement for the Parsec class of libraries. However be aware that the library
 is new and unstable.
