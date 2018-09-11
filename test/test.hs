@@ -39,11 +39,6 @@ randomAsciiString = do
   n <- randomRIO (1, randomStringLen)
   T.pack <$> replicateM n (randomRIO (C.chr 1, C.chr 127))
 
-loop :: Applicative f => (Char -> f a) -> Text -> f ()
-loop f s
-  | T.null s = pure ()
-  | otherwise = f (T.head s) *> loop f (T.tail s)
-
 tests :: TestTree
 tests = testGroup "Tests"
   [ testGroup "Chunk"
@@ -80,7 +75,7 @@ charTests run =
 
     , testCase "satisfy-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (loop (satisfy . (==)) s *> eof) s ()
+        ok (traverse (satisfy . (==)) (T.unpack s) *> eof) s ()
 
     , testCase "char" $ do
         ok (char 'a') "abc" 'a'
@@ -90,7 +85,7 @@ charTests run =
 
     , testCase "char-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (loop char s *> eof) s ()
+        ok (traverse char (T.unpack s) *> eof) s ()
 
     , testCase "asciiSatisfy" $ do
         ok (asciiSatisfy (== asc_a)) "abc" asc_a
@@ -104,7 +99,7 @@ charTests run =
 
     , testCase "asciiSatisfy-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (loop (asciiSatisfy . (==) . fromIntegral . C.ord) s *> eof) s ()
+        ok (traverse (asciiSatisfy . (==) . fromIntegral . C.ord) (T.unpack s) *> eof) s ()
 
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
@@ -115,7 +110,7 @@ charTests run =
 
     , testCase "asciiByte-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (loop (asciiByte . fromIntegral . C.ord) s *> eof) s ()
+        ok (traverse (asciiByte . fromIntegral . C.ord) (T.unpack s) *> eof) s ()
     ]
 
   , testGroup "Char Combinators"
@@ -135,7 +130,7 @@ charTests run =
 
     , testCase "anyChar-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (loop (const anyChar) s *> eof) s ()
+        ok (traverse (const anyChar) (T.unpack s) *> eof) s ()
 
     , testCase "anyAsciiByte" $ do
         ok anyAsciiByte "abc" asc_a
@@ -145,7 +140,7 @@ charTests run =
 
     , testCase "anyAsciiByte-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (loop (const anyAsciiByte) s *> eof) s ()
+        ok (traverse (const anyAsciiByte) (T.unpack s) *> eof) s ()
 
     , testCase "notChar" $ do
         ok (notChar 'b') "abc" 'a'
