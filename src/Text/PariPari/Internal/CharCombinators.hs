@@ -25,12 +25,15 @@ module Text.PariPari.Internal.CharCombinators (
   , punctuationChar
   , spaceChar
   , asciiChar
+  , satisfy
   , skipChars
   , takeChars
   , skipCharsWhile
   , takeCharsWhile
   , skipCharsWhile1
   , takeCharsWhile1
+  , scanCharsWhile
+  , scanCharsWhile1
   , string
 ) where
 
@@ -289,3 +292,17 @@ takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
 string :: CharParser k p => Text -> p Text
 string t = t <$ chunk (textToChunk t)
 {-# INLINE string #-}
+
+-- | Parse a single character with the given predicate
+satisfy :: CharParser k p => (Char -> Bool) -> p Char
+satisfy f = scan $ \c -> if f c then Just c else Nothing
+{-# INLINE satisfy #-}
+
+scanCharsWhile :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanCharsWhile f = go
+  where go s = (scan (f s) >>= go) <|> pure s
+{-# INLINE scanCharsWhile #-}
+
+scanCharsWhile1 :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanCharsWhile1 f s = scan (f s) >>= scanCharsWhile f
+{-# INLINE scanCharsWhile1 #-}

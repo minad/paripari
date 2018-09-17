@@ -87,8 +87,8 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- | Parse a single element
   element :: Element k -> p (Element k)
 
-  -- | Parse a single byte with the given predicate
-  elementSatisfy :: (Element k -> Bool) -> p (Element k)
+  -- | Scan a single byte
+  elementScan :: (Element k -> Maybe a) -> p a
 
   -- | Parse a chunk of elements. The chunk must not
   -- contain multiple lines, otherwise the position information
@@ -106,11 +106,11 @@ class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
   -- since it is used as decoding sentinel. Use 'element' instead.
   char :: Char -> p Char
 
-  -- | Parse a single character with the given predicate
+  -- | Scan a single character
   --
   -- __Note__: The character '\0' cannot be parsed using this combinator
-  -- since it is used as decoding sentinel. Use 'elementSatisfy' instead.
-  satisfy :: (Char -> Bool) -> p Char
+  -- since it is used as decoding sentinel. Use 'elementScan' instead.
+  scan :: (Char -> Maybe a) -> p a
 
   -- | Parse a single character within the ASCII charset
   --

@@ -154,15 +154,15 @@ instance Chunk k => ChunkParser k (Acceptor k) where
            err $ ECombinator "element"
   {-# INLINE element #-}
 
-  elementSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  elementScan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff < _envEnd env,
          (e, w) <- elementAt @k (_envBuf env) _stOff,
-         f e,
+         Just r <- f e,
          pos <- elementPos @k e (Pos _stLine _stCol) ->
-           ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+           ok r st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
        | otherwise ->
-           err $ ECombinator "elementSatisfy"
-  {-# INLINE elementSatisfy #-}
+           err $ ECombinator "elementScan"
+  {-# INLINE elementScan #-}
 
   chunk k = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
     let n = chunkWidth @k k
@@ -182,18 +182,18 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   {-# INLINE asChunk #-}
 
 instance CharChunk k => CharParser k (Acceptor k) where
-  satisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  scan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
-         f c ->
-           ok c st
+         Just r <- f c ->
+           ok r st
            { _stOff = _stOff + w
            , _stLine = if c == '\n' then _stLine + 1 else _stLine
            , _stCol = if c == '\n' then 1 else _stCol + 1
            }
        | otherwise ->
-           err $ ECombinator "satisfy"
-  {-# INLINE satisfy #-}
+           err $ ECombinator "scan"
+  {-# INLINE scan #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimised decoder.

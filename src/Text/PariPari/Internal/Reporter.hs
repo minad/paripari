@@ -197,17 +197,17 @@ instance Chunk k => ChunkParser k (Reporter k) where
            raiseError env st err $ EExpected [showElement @k e]
   {-# INLINE element #-}
 
-  elementSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  elementScan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let (e, w) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env ->
               raiseError env st err unexpectedEnd
           | _stOff < _envEnd env,
-            f e,
+            Just r <- f e,
             pos <- elementPos @k e (Pos _stLine _stCol) ->
-              ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+              ok r st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
           | otherwise ->
               raiseError env st err $ EUnexpected $ showElement @k e
-  {-# INLINE elementSatisfy #-}
+  {-# INLINE elementScan #-}
 
   chunk k = Reporter $ \env st@State{_stOff,_stCol} ok err ->
     let n = chunkWidth @k k
@@ -227,22 +227,23 @@ instance Chunk k => ChunkParser k (Reporter k) where
   {-# INLINE asChunk #-}
 
 instance CharChunk k => CharParser k (Reporter k) where
-  satisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  scan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0' ->
-           if f c then
-             ok c st
-             { _stOff = _stOff + w
-             , _stLine = if c == '\n' then _stLine + 1 else _stLine
-             , _stCol = if c == '\n' then 1 else _stCol + 1
-             }
-           else
-             raiseError env st err $ EUnexpected $ show c
+           case f c of
+             Just r ->
+               ok r st
+               { _stOff = _stOff + w
+               , _stLine = if c == '\n' then _stLine + 1 else _stLine
+               , _stCol = if c == '\n' then 1 else _stCol + 1
+               }
+             Nothing ->
+               raiseError env st err $ EUnexpected $ show c
        | _stOff >= _envEnd env ->
            raiseError env st err unexpectedEnd
        | otherwise ->
            raiseError env st err EInvalidUtf8
-  {-# INLINE satisfy #-}
+  {-# INLINE scan #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimised decoder.

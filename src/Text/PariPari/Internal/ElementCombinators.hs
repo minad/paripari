@@ -48,12 +48,15 @@ module Text.PariPari.Internal.ElementCombinators (
   , linefold
   , notElement
   , anyElement
+  , elementSatisfy
   , takeElements
   , skipElements
   , skipElementsWhile
   , takeElementsWhile
   , skipElementsWhile1
   , takeElementsWhile1
+  , scanElementsWhile
+  , scanElementsWhile1
 ) where
 
 import Control.Applicative ((<|>), empty)
@@ -61,8 +64,8 @@ import Control.Monad (when)
 import Control.Monad.Combinators (skipCount, skipMany)
 import Data.Functor (void)
 import Prelude hiding (getLine)
-import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.Chunk
+import Text.PariPari.Internal.Class
 import qualified Control.Monad.Combinators as O
 import qualified Control.Monad.Combinators.NonEmpty as ON
 
@@ -182,3 +185,17 @@ skipElementsWhile1 f = elementSatisfy f *> skipElementsWhile f
 takeElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p k
 takeElementsWhile1 f = asChunk (skipElementsWhile1 f)
 {-# INLINE takeElementsWhile1 #-}
+
+-- | Parse a single byte with the given predicate
+elementSatisfy :: ChunkParser k p => (Element k -> Bool) -> p (Element k)
+elementSatisfy f = elementScan $ \e -> if f e then Just e else Nothing
+{-# INLINE elementSatisfy #-}
+
+scanElementsWhile :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
+scanElementsWhile f = go
+  where go s = (elementScan (f s) >>= go) <|> pure s
+{-# INLINE scanElementsWhile #-}
+
+scanElementsWhile1 :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
+scanElementsWhile1 f s = elementScan (f s) >>= scanElementsWhile f
+{-# INLINE scanElementsWhile1 #-}

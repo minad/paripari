@@ -63,21 +63,7 @@ charTests :: forall k p e. (CharParser k p, CharChunk k, Eq e, Show e, Show k)
           => (forall a. p a -> FilePath -> k -> Either e a) -> [TestTree]
 charTests run =
   [ testGroup "CharParser" $
-    [ testCase "satisfy" $ do
-        ok (satisfy (== 'a')) "abc" 'a'
-        ok (satisfy (== 'a') <* eof) "a" 'a'
-        err (satisfy (== 'b')) "abc"
-        err (satisfy (== 'a')) ""
-
-        -- because of sentinel
-        err (satisfy (== '\0')) "\0"
-        err (satisfy (== '\0')) ""
-
-    , testCase "satisfy-random" $ replicateM_ randomTries $ do
-        s <- randomString
-        ok (traverse (satisfy . (==)) (T.unpack s) *> eof) s ()
-
-    , testCase "char" $ do
+    [ testCase "char" $ do
         ok (char 'a') "abc" 'a'
         ok (char 'a' <* eof) "a" 'a'
         err (char 'b') "abc"
@@ -114,7 +100,21 @@ charTests run =
     ]
 
   , testGroup "Char Combinators"
-    [ testCase "string" $ do
+    [ testCase "satisfy" $ do
+        ok (satisfy (== 'a')) "abc" 'a'
+        ok (satisfy (== 'a') <* eof) "a" 'a'
+        err (satisfy (== 'b')) "abc"
+        err (satisfy (== 'a')) ""
+
+        -- because of sentinel
+        err (satisfy (== '\0')) "\0"
+        err (satisfy (== '\0')) ""
+
+    , testCase "satisfy-random" $ replicateM_ randomTries $ do
+        s <- randomString
+        ok (traverse (satisfy . (==)) (T.unpack s) *> eof) s ()
+
+    , testCase "string" $ do
         ok (string "ab") "abc" "ab"
         err (string "bc") "abc"
         err (string "ab") ""
@@ -433,17 +433,6 @@ chunkTests run =
         ok (commit $ element 'a') "abc" 'a'
         err (commit $ element 'b') "abc"
 
-    , testCase "elementSatisfy" $ do
-        ok (elementSatisfy (== 'a')) "abc" 'a'
-        ok (elementSatisfy (== 'a') <* eof) "a" 'a'
-        err (elementSatisfy (== 'b')) "abc"
-        err (elementSatisfy (== 'a')) ""
-
-        -- sentinel
-        ok (elementSatisfy (== '\0')) "\0" '\0'
-        ok (elementSatisfy (== '\0') <* eof) "\0" '\0'
-        err (elementSatisfy (== '\0')) ""
-
     , testCase "element" $ do
         ok (element 'a') "abc" 'a'
         ok (element 'a' <* eof) "a" 'a'
@@ -507,7 +496,18 @@ chunkTests run =
     ]
 
   , testGroup "Element Combinators"
-    [ testCase "anyElement" $ do
+    [ testCase "elementSatisfy" $ do
+        ok (elementSatisfy (== 'a')) "abc" 'a'
+        ok (elementSatisfy (== 'a') <* eof) "a" 'a'
+        err (elementSatisfy (== 'b')) "abc"
+        err (elementSatisfy (== 'a')) ""
+
+        -- sentinel
+        ok (elementSatisfy (== '\0')) "\0" '\0'
+        ok (elementSatisfy (== '\0') <* eof) "\0" '\0'
+        err (elementSatisfy (== '\0')) ""
+
+    , testCase "anyElement" $ do
         ok anyElement "abc" 'a'
         err anyElement ""
 
@@ -638,4 +638,18 @@ linefold
 
 Fraction:
 fractionHex
+
+CharParser:
+scan
+
+ChunkParser:
+elementScan
+
+Element Combinators:
+scanElementsWhile
+scanElementsWhile1
+
+Char Combinators:
+scanCharsWhile
+scanCharsWhile1
 -}
