@@ -59,7 +59,7 @@ tests = testGroup "Tests"
     ]
   ]
 
-charTests :: forall k p e. (CharParser k p, CharChunk k, Eq e, Show e)
+charTests :: forall k p e. (CharParser k p, CharChunk k, Eq e, Show e, Show k)
           => (forall a. p a -> FilePath -> k -> Either e a) -> [TestTree]
 charTests run =
   [ testGroup "CharParser" $
@@ -226,6 +226,30 @@ charTests run =
         ok (digitByte 10 <* eof) "9" asc_9
         err (digitByte 10) "\0"
         err (digitByte 10) ""
+
+    , testCase "skipCharsWhile" $ do
+        ok (skipCharsWhile (== 'a')) "" ()
+        ok (skipCharsWhile (== 'a')) "b" ()
+        ok (skipCharsWhile (== 'a') *> eof) "aaa" ()
+        ok (skipCharsWhile (== 'a') *> char 'b') "aaab" 'b'
+
+    , testCase "takeCharsWhile" $ do
+        ok (takeCharsWhile (== 'a')) "" (textToChunk "")
+        ok (takeCharsWhile (== 'a')) "b" (textToChunk "")
+        ok (takeCharsWhile (== 'a') <* eof) "aaa" (textToChunk "aaa")
+        ok (takeCharsWhile (== 'a') <* char 'b') "aaab" (textToChunk "aaa")
+
+    , testCase "skipCharsWhile1" $ do
+        err (skipCharsWhile1 (== 'a')) ""
+        err (skipCharsWhile1 (== 'a')) "b"
+        ok (skipCharsWhile1 (== 'a') *> eof) "aaa" ()
+        ok (skipCharsWhile1 (== 'a') *> char 'b') "aaab" 'b'
+
+    , testCase "takeCharsWhile1" $ do
+        err (takeCharsWhile1 (== 'a')) ""
+        err (takeCharsWhile1 (== 'a')) "b"
+        ok (takeCharsWhile1 (== 'a') <* eof) "aaa" (textToChunk "aaa")
+        ok (takeCharsWhile1 (== 'a') <* char 'b') "aaab" (textToChunk "aaa")
     ]
 
   , testGroup "Fraction Combinators"
@@ -477,6 +501,30 @@ chunkTests run =
         ok (notElement 'b') "abc" 'a'
         err (notElement 'a') "a"
         err (notElement 'a') ""
+
+    , testCase "takeElementsWhile" $ do
+        ok (takeElementsWhile (== 'a')) "" ""
+        ok (takeElementsWhile (== 'a')) "b" ""
+        ok (takeElementsWhile (== 'a') <* eof) "aaa" "aaa"
+        ok (takeElementsWhile (== 'a') <* element 'b') "aaab" "aaa"
+
+    , testCase "skipElementsWhile" $ do
+        ok (skipElementsWhile (== 'a')) "" ()
+        ok (skipElementsWhile (== 'a')) "b" ()
+        ok (skipElementsWhile (== 'a') *> eof) "aaa" ()
+        ok (skipElementsWhile (== 'a') *> element 'b') "aaab" 'b'
+
+    , testCase "skipElementsWhile1" $ do
+        err (skipElementsWhile1 (== 'a')) ""
+        err (skipElementsWhile1 (== 'a')) "b"
+        ok (skipElementsWhile1 (== 'a') *> eof) "aaa" ()
+        ok (skipElementsWhile1 (== 'a') *> element 'b') "aaab" 'b'
+
+    , testCase "takeElementsWhile1" $ do
+        err (takeElementsWhile1 (== 'a')) ""
+        err (takeElementsWhile1 (== 'a')) "b"
+        ok (takeElementsWhile1 (== 'a') <* eof) "aaa" "aaa"
+        ok (takeElementsWhile1 (== 'a') <* element 'b') "aaab" "aaa"
     ]
 
   , testGroup "MonadFail"
@@ -566,16 +614,8 @@ fractionHex
 Char Combinators:
 skipChars
 takeChars
-skipCharsWhile
-takeCharsWhile
-skipCharsWhile1
-takeCharsWhile1
 
 Element Combinators:
 takeElements
 skipElements
-skipElementsWhile
-takeElementsWhile
-skipElementsWhile1
-takeElementsWhile1
 -}
