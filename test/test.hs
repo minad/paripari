@@ -227,6 +227,20 @@ charTests run =
         err (digitByte 10) "\0"
         err (digitByte 10) ""
 
+    , testCase "skipChars" $ do
+        ok (skipChars 0) "" ()
+        ok (skipChars 3 <* eof) "abc" ()
+        ok (skipChars 3 <* char 'b') "aaab" ()
+        err (skipChars 1) ""
+        err (skipChars 2) "a"
+
+    , testCase "takeChars" $ do
+        ok (takeChars 0) "" (textToChunk "")
+        ok (takeChars 3 <* eof) "abc" (textToChunk "abc")
+        ok (takeChars 3 <* char 'b') "aaab" (textToChunk "aaa")
+        err (takeChars 1) ""
+        err (takeChars 2) "a"
+
     , testCase "skipCharsWhile" $ do
         ok (skipCharsWhile (== 'a')) "" ()
         ok (skipCharsWhile (== 'a')) "b" ()
@@ -508,6 +522,20 @@ chunkTests run =
         ok (takeElementsWhile (== 'a') <* eof) "aaa" "aaa"
         ok (takeElementsWhile (== 'a') <* element 'b') "aaab" "aaa"
 
+    , testCase "skipElements" $ do
+        ok (skipElements 0) "" ()
+        ok (skipElements 3 <* eof) "abc" ()
+        ok (skipElements 3 <* element 'b') "aaab" ()
+        err (skipElements 1) ""
+        err (skipElements 2) "a"
+
+    , testCase "takeElements" $ do
+        ok (takeElements 0) "" ""
+        ok (takeElements 3 <* eof) "abc" "abc"
+        ok (takeElements 3 <* element 'b') "aaab" "aaa"
+        err (takeElements 1) ""
+        err (takeElements 2) "a"
+
     , testCase "skipElementsWhile" $ do
         ok (skipElementsWhile (== 'a')) "" ()
         ok (skipElementsWhile (== 'a')) "b" ()
@@ -610,12 +638,4 @@ linefold
 
 Fraction:
 fractionHex
-
-Char Combinators:
-skipChars
-takeChars
-
-Element Combinators:
-takeElements
-skipElements
 -}
