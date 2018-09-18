@@ -87,11 +87,11 @@ newtype Reporter k a = Reporter
                -> b
   }
 
-instance (Chunk k, Sem.Semigroup a) => Sem.Semigroup (Reporter k a) where
+instance (Chunk k, Semigroup a) => Sem.Semigroup (Reporter k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
   {-# INLINE (<>) #-}
 
-instance (Chunk k, Monoid a) => Monoid (Reporter k a) where
+instance (Chunk k, Semigroup a, Monoid a) => Monoid (Reporter k a) where
   mempty = pure mempty
   {-# INLINE mempty #-}
 
