@@ -82,6 +82,26 @@ charTests run =
         s <- randomString
         ok (traverse char s *> eof) s ()
 
+    , testCase "scan" $ do
+        ok (scan (\c -> if c == 'a' then Just c else Nothing)) "abc" 'a'
+        ok (scan (\c -> if c == 'a' then Just c else Nothing) <* eof) "a" 'a'
+        err (scan (\c -> if c == 'b' then Just c else Nothing)) "abc"
+        err (scan (\c -> if c == 'a' then Just c else Nothing)) ""
+
+        -- because of sentinel
+        err (scan (\c -> if c == '\0' then Just c else Nothing)) "\0"
+        err (scan (\c -> if c == '\0' then Just c else Nothing)) ""
+
+    , testCase "asciiScan" $ do
+        ok (asciiScan (\c -> if c == asc_a then Just c else Nothing)) "abc" asc_a
+        ok (asciiScan (\c -> if c == asc_a then Just c else Nothing) <* eof) "a" asc_a
+        err (asciiScan (\c -> if c == asc_0 then Just c else Nothing)) "abc"
+        err (asciiScan (\c -> if c == asc_0 then Just c else Nothing)) ""
+
+        -- because of sentinel
+        err (asciiScan (\c -> if c == 0 then Just c else Nothing)) "\0"
+        err (asciiScan (\c -> if c == 0 then Just c else Nothing)) ""
+
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
         ok (asciiByte asc_a <* eof) "a" asc_a
@@ -662,10 +682,6 @@ linefold
 Fraction:
 fraction
 fractionHex
-
-CharParser:
-scan
-asciiScan
 
 Element Combinators:
 scanElements
