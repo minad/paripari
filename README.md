@@ -12,7 +12,7 @@ This allows for fast parsing in the good case without compromising on the qualit
 this idea coming up times before, suggesting to use two different libraries (Trifecta after Attoparsec etc...).
 This library provides both parsers out of the box with equivalent behaviour, in particular with respect to backtracking.
 
-Unlike Parsec and like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
+Like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
 PariPari operates on strict `ByteString` and `Text`.
 As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
