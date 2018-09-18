@@ -120,11 +120,11 @@ class (ChunkParser k p, IsString (p k), CharChunk k) => CharParser k p | p -> k 
   -- since it is used as decoding sentinel. Use 'element' instead.
   asciiByte :: Word8 -> p Word8
 
-  -- | Parse a single character within the ASCII charset with the given predicate
+  -- | Scan a single character within the ASCII charset
   --
   -- __Note__: The character '\0' cannot be parsed using this combinator
-  -- since it is used as decoding sentinel. Use 'elementSatisfy' instead.
-  asciiSatisfy :: (Word8 -> Bool) -> p Word8
+  -- since it is used as decoding sentinel. Use 'elementScan' instead.
+  asciiScan :: (Word8 -> Maybe a) -> p a
 
 -- | Pretty string representation of 'Error'
 showError :: Error -> String

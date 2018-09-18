@@ -82,20 +82,6 @@ charTests run =
         s <- randomString
         ok (traverse char s *> eof) s ()
 
-    , testCase "asciiSatisfy" $ do
-        ok (asciiSatisfy (== asc_a)) "abc" asc_a
-        ok (asciiSatisfy (== asc_a) <* eof) "a" asc_a
-        err (asciiSatisfy (== asc_0)) "abc"
-        err (asciiSatisfy (== asc_0)) ""
-
-        -- because of sentinel
-        err (asciiSatisfy (== 0)) "\0"
-        err (asciiSatisfy (== 0)) ""
-
-    , testCase "asciiSatisfy-random" $ replicateM_ randomTries $ do
-        s <- randomAsciiString
-        ok (traverse (asciiSatisfy . (==) . fromIntegral . C.ord) s *> eof) s ()
-
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
         ok (asciiByte asc_a <* eof) "a" asc_a
@@ -122,6 +108,20 @@ charTests run =
     , testCase "satisfy-random" $ replicateM_ randomTries $ do
         s <- randomString
         ok (traverse (satisfy . (==)) s *> eof) s ()
+
+    , testCase "asciiSatisfy" $ do
+        ok (asciiSatisfy (== asc_a)) "abc" asc_a
+        ok (asciiSatisfy (== asc_a) <* eof) "a" asc_a
+        err (asciiSatisfy (== asc_0)) "abc"
+        err (asciiSatisfy (== asc_0)) ""
+
+        -- because of sentinel
+        err (asciiSatisfy (== 0)) "\0"
+        err (asciiSatisfy (== 0)) ""
+
+    , testCase "asciiSatisfy-random" $ replicateM_ randomTries $ do
+        s <- randomAsciiString
+        ok (traverse (asciiSatisfy . (==) . fromIntegral . C.ord) s *> eof) s ()
 
     , testCase "string" $ do
         ok (string "ab") "abc" (stringToChunk "ab")
@@ -655,6 +655,7 @@ fractionHex
 
 CharParser:
 scan
+asciiScan
 
 ChunkParser:
 elementScan

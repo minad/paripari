@@ -27,6 +27,7 @@ module Text.PariPari.Internal.CharCombinators (
   , spaceChar
   , asciiChar
   , satisfy
+  , asciiSatisfy
   , skipChars
   , takeChars
   , skipCharsWhile
@@ -302,6 +303,11 @@ takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
 satisfy :: CharParser k p => (Char -> Bool) -> p Char
 satisfy f = scan $ \c -> if f c then Just c else Nothing
 {-# INLINE satisfy #-}
+
+-- | Parse a single character within the ASCII charset with the given predicate
+asciiSatisfy :: CharParser k p => (Word8 -> Bool) -> p Word8
+asciiSatisfy f = asciiScan $ \b -> if f b then Just b else Nothing
+{-# INLINE asciiSatisfy #-}
 
 scanCharsWhile :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
 scanCharsWhile f = go

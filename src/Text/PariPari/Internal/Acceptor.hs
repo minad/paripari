@@ -212,19 +212,19 @@ instance CharChunk k => CharParser k (Acceptor k) where
           err $ ECombinator "char"
   {-# INLINE char #-}
 
-  asciiSatisfy f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  asciiScan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | b <- byteAt @k (_envBuf env) _stOff,
          b /= 0,
          b < 128,
-         f b ->
-           ok b st
+         Just x <- f b ->
+           ok x st
            { _stOff = _stOff + 1
            , _stLine = if b == asc_newline then _stLine + 1 else _stLine
            , _stCol = if b == asc_newline then 1 else _stCol + 1
            }
        | otherwise ->
-           err $ ECombinator "asciiSatisfy"
-  {-# INLINE asciiSatisfy #-}
+           err $ ECombinator "asciiScan"
+  {-# INLINE asciiScan #-}
 
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b

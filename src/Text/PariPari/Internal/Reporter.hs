@@ -262,12 +262,12 @@ instance CharChunk k => CharParser k (Reporter k) where
           raiseError env st err $ EExpected [show c]
   {-# INLINE char #-}
 
-  asciiSatisfy f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
     in if | b /= 0,
             b < 128,
-            f b ->
-              ok b st
+            Just x <- f b ->
+              ok x st
               { _stOff = _stOff + 1
               , _stLine = if b == asc_newline then _stLine + 1 else _stLine
               , _stCol = if b == asc_newline then 1 else _stCol + 1
@@ -276,7 +276,7 @@ instance CharChunk k => CharParser k (Reporter k) where
               raiseError env st err unexpectedEnd
           | otherwise ->
               raiseError env st err $ EUnexpected $ showByte b
-  {-# INLINE asciiSatisfy #-}
+  {-# INLINE asciiScan #-}
 
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
