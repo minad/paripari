@@ -28,6 +28,7 @@ import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.String (IsString(..))
 import GHC.Generics (Generic)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
@@ -290,6 +291,10 @@ instance CharChunk k => CharParser k (Reporter k) where
         else
           raiseError env st err $ EExpected [showByte b]
   {-# INLINE asciiByte #-}
+
+instance CharChunk k => IsString (Reporter k k) where
+  fromString = string
+  {-# INLINE fromString #-}
 
 raiseError :: Env k -> State -> (State -> b) -> Error -> b
 raiseError env st err e = err $ addError env st e

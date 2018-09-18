@@ -9,9 +9,10 @@ module Text.PariPari.Internal.Tracer (
   , runTracer
 ) where
 
+import Data.String (IsString)
 import Debug.Trace (trace)
-import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.Chunk
+import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.Reporter
 import qualified Control.Monad.Fail as Fail
 
@@ -21,6 +22,7 @@ newtype Tracer k a = Tracer { unTracer :: Reporter k a }
 
 deriving instance CharChunk k => ChunkParser k (Tracer k)
 deriving instance CharChunk k => CharParser k (Tracer k)
+deriving instance CharChunk k => IsString (Tracer k k)
 
 instance Chunk k => Alternative (Tracer k) where
   empty = Tracer empty

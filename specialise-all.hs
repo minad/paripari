@@ -55,7 +55,7 @@ name = asChunk (sepEndBy (identifierAtom C.isUpper) (char '.') *>
 typeName :: Parser StringType
 typeName = asChunk (void $ sepBy1 (identifierAtom C.isUpper) (char '.')) <* space
 
-symbol :: ParserMonad p => StringType -> p StringType
+symbol :: ParserMonad p => String -> p StringType
 symbol s = string s <* space
 
 typeTuple :: Parser Type

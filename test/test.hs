@@ -15,10 +15,9 @@ import System.Random
 import Test.Tasty
 import Test.Tasty.HUnit
 import Text.PariPari
-import Text.PariPari.Internal.Chunk (textToChunk, asc_a, asc_0, asc_9)
+import Text.PariPari.Internal.Chunk (stringToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Text as T
 
 main :: IO ()
 main = defaultMain tests
@@ -29,15 +28,25 @@ randomTries = 1000
 randomStringLen :: Int
 randomStringLen = 1000
 
-randomString :: IO Text
+-- Only generate valid Unicode characters
+randomChar :: IO Char
+randomChar = do
+  c <- randomIO
+  let n = C.ord c
+  if n == 0 || (n >= 0xD800 && n <= 0xDFFF) || n > 0x10FFFF then
+    randomChar
+  else
+    pure c
+
+randomString :: IO String
 randomString = do
   n <- randomRIO (1, randomStringLen)
-  T.pack <$> replicateM n (randomRIO (C.chr 1, maxBound))
+  replicateM n randomChar
 
-randomAsciiString :: IO Text
+randomAsciiString :: IO String
 randomAsciiString = do
   n <- randomRIO (1, randomStringLen)
-  T.pack <$> replicateM n (randomRIO (C.chr 1, C.chr 127))
+  replicateM n (randomRIO (C.chr 1, C.chr 127))
 
 tests :: TestTree
 tests = testGroup "Tests"
@@ -71,7 +80,7 @@ charTests run =
 
     , testCase "char-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (traverse char (T.unpack s) *> eof) s ()
+        ok (traverse char s *> eof) s ()
 
     , testCase "asciiSatisfy" $ do
         ok (asciiSatisfy (== asc_a)) "abc" asc_a
@@ -85,7 +94,7 @@ charTests run =
 
     , testCase "asciiSatisfy-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (traverse (asciiSatisfy . (==) . fromIntegral . C.ord) (T.unpack s) *> eof) s ()
+        ok (traverse (asciiSatisfy . (==) . fromIntegral . C.ord) s *> eof) s ()
 
     , testCase "asciiByte" $ do
         ok (asciiByte asc_a) "abc" asc_a
@@ -96,7 +105,7 @@ charTests run =
 
     , testCase "asciiByte-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (traverse (asciiByte . fromIntegral . C.ord) (T.unpack s) *> eof) s ()
+        ok (traverse (asciiByte . fromIntegral . C.ord) s *> eof) s ()
     ]
 
   , testGroup "Char Combinators"
@@ -112,16 +121,16 @@ charTests run =
 
     , testCase "satisfy-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (traverse (satisfy . (==)) (T.unpack s) *> eof) s ()
+        ok (traverse (satisfy . (==)) s *> eof) s ()
 
     , testCase "string" $ do
-        ok (string "ab") "abc" "ab"
+        ok (string "ab") "abc" (stringToChunk "ab")
         err (string "bc") "abc"
         err (string "ab") ""
 
     , testCase "string-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (string s <* eof) s s
+        ok (string s <* eof) s (stringToChunk s)
 
     , testCase "anyChar" $ do
         ok anyChar "abc" 'a'
@@ -130,7 +139,7 @@ charTests run =
 
     , testCase "anyChar-random" $ replicateM_ randomTries $ do
         s <- randomString
-        ok (traverse (const anyChar) (T.unpack s) *> eof) s ()
+        ok (traverse (const anyChar) s *> eof) s ()
 
     , testCase "anyAsciiByte" $ do
         ok anyAsciiByte "abc" asc_a
@@ -140,7 +149,7 @@ charTests run =
 
     , testCase "anyAsciiByte-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
-        ok (traverse (const anyAsciiByte) (T.unpack s) *> eof) s ()
+        ok (traverse (const anyAsciiByte) s *> eof) s ()
 
     , testCase "notChar" $ do
         ok (notChar 'b') "abc" 'a'
@@ -235,9 +244,9 @@ charTests run =
         err (skipChars 2) "a"
 
     , testCase "takeChars" $ do
-        ok (takeChars 0) "" (textToChunk "")
-        ok (takeChars 3 <* eof) "abc" (textToChunk "abc")
-        ok (takeChars 3 <* char 'b') "aaab" (textToChunk "aaa")
+        ok (takeChars 0) "" (stringToChunk "")
+        ok (takeChars 3 <* eof) "abc" (stringToChunk "abc")
+        ok (takeChars 3 <* char 'b') "aaab" (stringToChunk "aaa")
         err (takeChars 1) ""
         err (takeChars 2) "a"
 
@@ -248,10 +257,10 @@ charTests run =
         ok (skipCharsWhile (== 'a') *> char 'b') "aaab" 'b'
 
     , testCase "takeCharsWhile" $ do
-        ok (takeCharsWhile (== 'a')) "" (textToChunk "")
-        ok (takeCharsWhile (== 'a')) "b" (textToChunk "")
-        ok (takeCharsWhile (== 'a') <* eof) "aaa" (textToChunk "aaa")
-        ok (takeCharsWhile (== 'a') <* char 'b') "aaab" (textToChunk "aaa")
+        ok (takeCharsWhile (== 'a')) "" (stringToChunk "")
+        ok (takeCharsWhile (== 'a')) "b" (stringToChunk "")
+        ok (takeCharsWhile (== 'a') <* eof) "aaa" (stringToChunk "aaa")
+        ok (takeCharsWhile (== 'a') <* char 'b') "aaab" (stringToChunk "aaa")
 
     , testCase "skipCharsWhile1" $ do
         err (skipCharsWhile1 (== 'a')) ""
@@ -262,8 +271,8 @@ charTests run =
     , testCase "takeCharsWhile1" $ do
         err (takeCharsWhile1 (== 'a')) ""
         err (takeCharsWhile1 (== 'a')) "b"
-        ok (takeCharsWhile1 (== 'a') <* eof) "aaa" (textToChunk "aaa")
-        ok (takeCharsWhile1 (== 'a') <* char 'b') "aaab" (textToChunk "aaa")
+        ok (takeCharsWhile1 (== 'a') <* eof) "aaa" (stringToChunk "aaa")
+        ok (takeCharsWhile1 (== 'a') <* char 'b') "aaab" (stringToChunk "aaa")
     ]
 
   , testGroup "Fraction Combinators"
@@ -369,10 +378,10 @@ charTests run =
     ]
   ]
   where
-  ok :: (Eq a, Show a, HasCallStack) => p a -> Text -> a -> Assertion
-  ok p i o = run p "filename" (textToChunk @k i) @?= Right o
-  err :: (Eq a, Show a, HasCallStack) => p a -> Text -> Assertion
-  err p i = assertBool "err" $ isLeft $ run p "filename" (textToChunk @k i)
+  ok :: (Eq a, Show a, HasCallStack) => p a -> String -> a -> Assertion
+  ok p i o = run p "filename" (stringToChunk @k i) @?= Right o
+  err :: (Eq a, Show a, HasCallStack) => p a -> String -> Assertion
+  err p i = assertBool "err" $ isLeft $ run p "filename" (stringToChunk @k i)
 
 chunkTests :: forall p e. (ChunkParser Text p, Eq e, Show e)
           => (forall a. p a -> FilePath -> Text -> Either e a) -> [TestTree]

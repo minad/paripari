@@ -41,7 +41,6 @@ import Control.Applicative ((<|>), optional)
 import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.Functor (void)
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import Data.Word (Word8)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
@@ -287,11 +286,6 @@ takeCharsWhile f = asChunk (skipCharsWhile f)
 takeCharsWhile1 :: CharParser k p => (Char -> Bool) -> p k
 takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
 {-# INLINE takeCharsWhile1 #-}
-
--- | Parse a string
-string :: CharParser k p => Text -> p Text
-string t = t <$ chunk (textToChunk t)
-{-# INLINE string #-}
 
 -- | Parse a single character with the given predicate
 satisfy :: CharParser k p => (Char -> Bool) -> p Char

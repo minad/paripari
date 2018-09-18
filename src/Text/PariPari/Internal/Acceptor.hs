@@ -15,8 +15,9 @@ module Text.PariPari.Internal.Acceptor (
 ) where
 
 import Control.Monad (void)
-import Text.PariPari.Internal.Class
+import Data.String (IsString(..))
 import Text.PariPari.Internal.Chunk
+import Text.PariPari.Internal.Class
 import qualified Control.Monad.Fail as Fail
 
 data Env k = Env
@@ -238,6 +239,10 @@ instance CharChunk k => CharParser k (Acceptor k) where
         else
           err $ ECombinator "asciiByte"
   {-# INLINE asciiByte #-}
+
+instance CharChunk k => IsString (Acceptor k k) where
+  fromString = string
+  {-# INLINE fromString #-}
 
 -- | Reader monad, get something from the environment
 get :: (Env k -> State -> a) -> Acceptor k a

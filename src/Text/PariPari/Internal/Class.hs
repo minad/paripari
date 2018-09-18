@@ -10,12 +10,14 @@ module Text.PariPari.Internal.Class (
   , showError
   , expectedEnd
   , unexpectedEnd
+  , string
 ) where
 
 import Control.Applicative (Alternative(empty, (<|>)))
 import Control.Monad (MonadPlus(..))
 import Control.Monad.Fail (MonadFail(..))
 import Data.List (intercalate)
+import Data.String (IsString)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Text.PariPari.Internal.Chunk
@@ -99,7 +101,7 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- result as buffer
   asChunk :: p () -> p k
 
-class (ChunkParser k p, CharChunk k) => CharParser k p | p -> k where
+class (ChunkParser k p, IsString (p k), CharChunk k) => CharParser k p | p -> k where
   -- | Parse a single character
   --
   -- __Note__: The character '\0' cannot be parsed using this combinator
@@ -140,3 +142,8 @@ expectedEnd = EExpected ["end of file"]
 
 unexpectedEnd :: Error
 unexpectedEnd = EUnexpected "end of file"
+
+-- | Parse a string
+string :: CharParser k p => String -> p k
+string t = chunk (stringToChunk t)
+{-# INLINE string #-}

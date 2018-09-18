@@ -55,7 +55,7 @@ class Chunk k => CharChunk k where
   charAt :: Buffer k -> Int -> (Char, Int)
   charAtFixed :: Int -> Buffer k -> Int -> Char
   charWidth :: Char -> Int
-  textToChunk :: Text -> k
+  stringToChunk :: String -> k
 
 instance Chunk ByteString where
   type Element  ByteString = Word8
@@ -99,8 +99,8 @@ instance CharChunk ByteString where
   charAtFixed = ptrDecodeFixedUtf8
   {-# INLINE charAtFixed #-}
 
-  textToChunk t = T.encodeUtf8 t
-  {-# INLINE textToChunk #-}
+  stringToChunk t = T.encodeUtf8 $ fromString t
+  {-# INLINE stringToChunk #-}
 
 instance Chunk Text where
   type Element  Text = Char
@@ -144,8 +144,8 @@ instance CharChunk Text where
   charAtFixed n b i = fst $ arrayCharAt n b i
   {-# INLINE charAtFixed #-}
 
-  textToChunk t = t
-  {-# INLINE textToChunk #-}
+  stringToChunk t = fromString t
+  {-# INLINE stringToChunk #-}
 
 arrayByteAt :: T.Array -> Int -> Word8
 arrayByteAt a i
