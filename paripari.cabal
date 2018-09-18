@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3cefc7b68ef2d47349837d0a9c7462724f7de28effd1174e99e9f0ce5e8a63e5
+-- hash: 28d1f983f5ddf472e03cf59995668dc7b01d811ddc130e74594ebdf91535d972
 
 name:           paripari
 version:        0.3.0.0
@@ -40,7 +40,7 @@ library
       Paths_paripari
   hs-source-dirs:
       src
-  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  ghc-options: -Wall -Wcompat -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
@@ -52,7 +52,7 @@ executable paripari-example
   main-is: example.hs
   other-modules:
       Paths_paripari
-  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  ghc-options: -Wall -Wcompat -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
@@ -65,7 +65,7 @@ executable paripari-specialise-all
   main-is: specialise-all.hs
   other-modules:
       Paths_paripari
-  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  ghc-options: -Wall -Wcompat -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
@@ -81,7 +81,7 @@ test-suite test
       Paths_paripari
   hs-source-dirs:
       test
-  ghc-options: -Wall -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
+  ghc-options: -Wall -Wcompat -Widentities -Wmonomorphism-restriction -Wincomplete-uni-patterns -Wincomplete-record-updates -Wtabs -fprint-potential-instances
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11

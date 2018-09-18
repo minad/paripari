@@ -16,6 +16,7 @@ module Text.PariPari.Internal.Chunk (
 import Data.Bits (unsafeShiftL, (.|.), (.&.))
 import Data.ByteString (ByteString)
 import Data.Foldable (foldl')
+import Data.Semigroup ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import Data.Word (Word8)

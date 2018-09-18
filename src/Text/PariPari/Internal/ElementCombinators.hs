@@ -63,6 +63,7 @@ import Control.Applicative ((<|>), empty)
 import Control.Monad (when)
 import Control.Monad.Combinators (skipCount, skipMany)
 import Data.Functor (void)
+import Data.Semigroup ((<>))
 import Prelude hiding (getLine)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class

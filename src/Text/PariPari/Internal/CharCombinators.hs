@@ -43,6 +43,7 @@ import Control.Applicative ((<|>), optional)
 import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.Functor (void)
 import Data.Maybe (fromMaybe)
+import Data.Semigroup ((<>))
 import Data.Word (Word8)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
