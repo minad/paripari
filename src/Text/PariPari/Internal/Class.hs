@@ -89,7 +89,7 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- | Parse a single element
   element :: Element k -> p (Element k)
 
-  -- | Scan a single byte
+  -- | Scan a single element
   elementScan :: (Element k -> Maybe a) -> p a
 
   -- | Parse a chunk of elements. The chunk must not

@@ -146,12 +146,12 @@ linefold :: ChunkP k ()
 linefold = line <|> indented
 {-# INLINE linefold #-}
 
--- | Parser a single byte different from the given one
+-- | Parser a single element different from the given one
 notElement :: forall k p. ChunkParser k p => Element k -> p (Element k)
 notElement e = elementSatisfy @k (/= e) <?> "not " <> showElement @k e
 {-# INLINE notElement #-}
 
--- | Parse an arbitrary byte
+-- | Parse an arbitrary element
 anyElement :: ChunkP k (Element k)
 anyElement = elementSatisfy (const True)
 {-# INLINE anyElement #-}
@@ -186,7 +186,7 @@ takeElementsWhile1 :: ChunkParser k p => (Element k -> Bool) -> p k
 takeElementsWhile1 f = asChunk (skipElementsWhile1 f)
 {-# INLINE takeElementsWhile1 #-}
 
--- | Parse a single byte with the given predicate
+-- | Parse a single element with the given predicate
 elementSatisfy :: ChunkParser k p => (Element k -> Bool) -> p (Element k)
 elementSatisfy f = elementScan $ \e -> if f e then Just e else Nothing
 {-# INLINE elementSatisfy #-}

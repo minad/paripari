@@ -458,6 +458,16 @@ chunkTests run =
         ok (element '\0' <* eof) "\0" '\0'
         err (element '\0') ""
 
+    , testCase "elementScan" $ do
+        ok (elementScan (\c -> if c == 'a' then Just c else Nothing)) "abc" 'a'
+        ok (elementScan (\c -> if c == 'a' then Just c else Nothing) <* eof) "a" 'a'
+        err (elementScan (\c -> if c == 'b' then Just c else Nothing)) "abc"
+        err (elementScan Just) ""
+
+        -- sentinel
+        ok (elementScan (\c -> if c == '\0' then Just c else Nothing)) "\0" '\0'
+        ok (elementScan (\c -> if c == '\0' then Just c else Nothing) <* eof) "\0" '\0'
+
     , testCase "chunk" $ do
         ok (chunk "ab") "abc" "ab"
         err (chunk "bc") "abc"
@@ -656,9 +666,6 @@ fractionHex
 CharParser:
 scan
 asciiScan
-
-ChunkParser:
-elementScan
 
 Element Combinators:
 scanElements
