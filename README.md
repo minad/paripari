@@ -151,9 +151,11 @@ for example by the `scientific` library.
 ``` haskell
 number :: Parser Value
 number = label "number" $ do
-  neg <- option id $ negate <$ char '-'
-  (c, _, e) <- fractionDec (pure ())
-  pure $ Number (neg c) e
+  neg <- sign
+  frac <- fractionDec (pure ())
+  pure $ case frac of
+           Left n -> Number (neg n) 0
+           Right (c, _, e) -> Number (neg c) e
 ```
 
 For spaces we need another helper function.

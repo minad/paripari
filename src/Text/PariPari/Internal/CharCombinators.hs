@@ -8,6 +8,7 @@ module Text.PariPari.Internal.CharCombinators (
   , octal
   , hexadecimal
   , digit
+  , sign
   , signed
   , fractionHex
   , fractionDec
@@ -133,46 +134,56 @@ hexadecimal :: Num a => CharP k a
 hexadecimal = integer (pure ()) 16
 {-# INLINE hexadecimal #-}
 
+-- | Parse plus or minus sign
+sign :: (CharParser k f, Num a) => f (a -> a)
+sign = (negate <$ asciiByte asc_minus) <|> (id <$ optional (asciiByte asc_plus))
+{-# INLINE sign #-}
+
 -- | Parse a number with a plus or minus sign.
 signed :: (Num a, CharParser k p) => p a -> p a
-signed p = ($) <$> ((id <$ asciiByte asc_plus) <|> (negate <$ asciiByte asc_minus) <|> pure id) <*> p
+signed p = ($) <$> sign <*> p
 {-# INLINE signed #-}
 
--- | Parse a fraction of arbitrary exponent base and coefficient base.
+fractionExp :: (Num a, CharParser k p) => p expSep -> p digitSep -> p (Maybe a)
+fractionExp expSep digitSep = do
+  e <- optional expSep
+  case e of
+    Nothing{} -> pure Nothing
+    Just{} -> Just <$> signed (integer digitSep 10)
+{-# INLINE fractionExp #-}
+
+-- | Parse a fraction of arbitrary exponent base and mantissa base.
 -- 'fractionDec' and 'fractionHex' should be used instead probably.
--- Does not parse integers.
+-- Returns either an integer in 'Left' or a fraction in 'Right'.
 -- Signs are not parsed by this combinator.
-fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (a, Int, a)
-fraction expSep expBase coeffBasePow digitSep = do
-  let coeffBase = expBase ^ coeffBasePow
-  coeff <- integer digitSep coeffBase
-  frac <- optional $ asciiByte asc_point *> option (0, 0) (integer' digitSep coeffBase)
-  expn <- optional $ expSep *> signed (integer digitSep 10)
+fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (Either a (a, Int, a))
+fraction expSep expBase mantBasePow digitSep = do
+  let mantBase = expBase ^ mantBasePow
+  mant <- integer digitSep mantBase
+  frac <- optional $ asciiByte asc_point *> option (0, 0) (integer' digitSep mantBase)
+  expn <- fractionExp expSep digitSep
   let (fracVal, fracLen) = fromMaybe (0, 0) frac
       expVal = fromMaybe 0 expn
-  case (frac, expn) of
-    (Nothing, Nothing) -> failWith $ EExpected ["fraction"]
-    _  ->
-      pure (coeff * fromIntegral coeffBase ^ fracLen + fracVal,
-            expBase,
-            expVal - fromIntegral (fracLen * coeffBasePow))
+  pure $ case (frac, expn) of
+           (Nothing, Nothing) -> Left mant
+           _ -> Right ( mant * fromIntegral mantBase ^ fracLen + fracVal
+                      , expBase
+                      , expVal - fromIntegral (fracLen * mantBasePow))
 {-# INLINE fraction #-}
 
--- | Parse a decimal fraction, returning (coefficient, 10, exponent),
--- corresponding to coefficient * 10^exponent.
+-- | Parse a decimal fraction, e.g., 123.456e-78, returning (mantissa, 10, exponent),
+-- corresponding to mantissa * 10^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
--- Does not parse integers.
 -- Signs are not parsed by this combinator.
-fractionDec :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
+fractionDec :: (Num a, CharParser k p) => p digitSep -> p (Either a (a, Int, a))
 fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
 
--- | Parse a hexadecimal fraction, returning (coefficient, 2, exponent),
--- corresponding to coefficient * 2^exponent.
+-- | Parse a hexadecimal fraction, e.g., co.ffeep123, returning (mantissa, 2, exponent),
+-- corresponding to mantissa * 2^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
--- Does not parse integers.
 -- Signs are not parsed by this combinator.
-fractionHex :: (Num a, CharParser k p) => p digitSep -> p (a, Int, a)
+fractionHex :: (Num a, CharParser k p) => p digitSep -> p (Either a (a, Int, a))
 fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
 

@@ -277,34 +277,35 @@ charTests run =
 
   , testGroup "Fraction Combinators"
     [ testCase "fractionDec" $ do
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "1.23" (123, 10, -2)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "99e0" (99, 10, 0)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "123.45" (12345, 10, -2)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "00123." (123, 10, 0)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "456.000" (456000, 10, -3)
+        okFraction (fractionDec (pure ()) <* eof) "1.23" (Right (123, 10, -2))
+        okFraction (fractionDec (pure ()) <* eof) "99e0" (Right (99, 10, 0))
+        okFraction (fractionDec (pure ()) <* eof) "123.45" (Right (12345, 10, -2))
+        okFraction (fractionDec (pure ()) <* eof) "00123." (Right (123, 10, 0))
+        okFraction (fractionDec (pure ()) <* eof) "456.000" (Right (456000, 10, -3))
 
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e-5" (987, 10, -5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e-123" (987, 10, -123)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e-67" (987654, 10, -70)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e-7" (987654000, 10, -13)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e-7" (987654000, 10, -13)
+        okFraction (fractionDec (pure ()) <* eof) "987e-5" (Right (987, 10, -5))
+        okFraction (fractionDec (pure ()) <* eof) "987.e-123" (Right (987, 10, -123))
+        okFraction (fractionDec (pure ()) <* eof) "987.654e-67" (Right (987654, 10, -70))
+        okFraction (fractionDec (pure ()) <* eof) "987.654000e-7" (Right (987654000, 10, -13))
+        okFraction (fractionDec (pure ()) <* eof) "000987.654000e-7" (Right (987654000, 10, -13))
 
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e+5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e+123" (987, 10, 123)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e+67" (987654, 10, 64)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e+7" (987654000, 10, 1)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e+7" (987654000, 10, 1)
+        okFraction (fractionDec (pure ()) <* eof) "987e+5" (Right (987, 10, 5))
+        okFraction (fractionDec (pure ()) <* eof) "987.e+123" (Right (987, 10, 123))
+        okFraction (fractionDec (pure ()) <* eof) "987.654e+67" (Right (987654, 10, 64))
+        okFraction (fractionDec (pure ()) <* eof) "987.654000e+7" (Right (987654000, 10, 1))
+        okFraction (fractionDec (pure ()) <* eof) "000987.654000e+7" (Right (987654000, 10, 1))
 
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987e5" (987, 10, 5)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.e123" (987, 10, 123)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654e67" (987654, 10, 64)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "987.654000e7" (987654000, 10, 1)
-        ok @(Integer, Int, Integer) (fractionDec (pure ()) <* eof) "000987.654000e7" (987654000, 10, 1)
+        okFraction (fractionDec (pure ()) <* eof) "987e5" (Right (987, 10, 5))
+        okFraction (fractionDec (pure ()) <* eof) "987.e123" (Right (987, 10, 123))
+        okFraction (fractionDec (pure ()) <* eof) "987.654e67" (Right (987654, 10, 64))
+        okFraction (fractionDec (pure ()) <* eof) "987.654000e7" (Right (987654000, 10, 1))
+        okFraction (fractionDec (pure ()) <* eof) "000987.654000e7" (Right (987654000, 10, 1))
 
-        err @(Integer, Int, Integer) (fractionDec (pure ())) ""
-        err @(Integer, Int, Integer) (fractionDec (pure ())) "123"
-        err @(Integer, Int, Integer) (fractionDec (pure ())) "123e"
-        err @(Integer, Int, Integer) (fractionDec (pure ())) "abc"
+        okFraction (fractionDec (pure ())) "123" (Left 123)
+
+        errFraction (fractionDec (pure ())) "123e"
+        errFraction (fractionDec (pure ())) ""
+        errFraction (fractionDec (pure ())) "abc"
     ]
 
   , testGroup "Integer Combinators"
@@ -382,6 +383,10 @@ charTests run =
   ok p i o = run p "filename" (stringToChunk @k i) @?= Right o
   err :: (Eq a, Show a, HasCallStack) => p a -> String -> Assertion
   err p i = assertBool "err" $ isLeft $ run p "filename" (stringToChunk @k i)
+  errFraction :: HasCallStack => p (Either Integer (Integer, Int, Integer)) -> String -> Assertion
+  errFraction = err
+  okFraction :: HasCallStack => p (Either Integer (Integer, Int, Integer)) -> String -> Either Integer (Integer, Int, Integer) -> Assertion
+  okFraction = ok
 
 chunkTests :: forall p e. (ChunkParser Text p, Eq e, Show e)
           => (forall a. p a -> FilePath -> Text -> Either e a) -> [TestTree]
@@ -604,7 +609,6 @@ chunkTests run =
   err :: (Eq a, Show a, HasCallStack) => p a -> Text -> Assertion
   err p i = assertBool "err" $ isLeft $ run p "filename" i
 
-
 {-
 TODO:
 
@@ -646,6 +650,7 @@ line
 linefold
 
 Fraction:
+fraction
 fractionHex
 
 CharParser:

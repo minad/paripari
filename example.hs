@@ -53,9 +53,11 @@ text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 
 number :: Parser Value
 number = label "number" $ do
-  neg <- option id $ negate <$ char '-'
-  (c, _, e) <- fractionDec (pure ())
-  pure $ Number (neg c) e
+  neg <- sign
+  frac <- fractionDec (pure ())
+  pure $ case frac of
+           Left n -> Number (neg n) 0
+           Right (c, _, e) -> Number (neg c) e
 
 space :: Parser ()
 space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
