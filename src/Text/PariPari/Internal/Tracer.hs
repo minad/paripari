@@ -9,6 +9,7 @@ module Text.PariPari.Internal.Tracer (
   , runTracer
 ) where
 
+import Data.Semigroup as Sem
 import Data.String (IsString)
 import Debug.Trace (trace)
 import Text.PariPari.Internal.Chunk
@@ -18,7 +19,7 @@ import qualified Control.Monad.Fail as Fail
 
 -- | Parser which prints trace messages, when backtracking occurs.
 newtype Tracer k a = Tracer { unTracer :: Reporter k a }
-  deriving (Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
+  deriving (Sem.Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
 
 deriving instance CharChunk k => ChunkParser k (Tracer k)
 deriving instance CharChunk k => CharParser k (Tracer k)

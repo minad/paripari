@@ -15,6 +15,7 @@ module Text.PariPari.Internal.Acceptor (
 ) where
 
 import Control.Monad (void)
+import Data.Semigroup as Sem
 import Data.String (IsString(..))
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
@@ -43,13 +44,16 @@ newtype Acceptor k a = Acceptor
                -> b
   }
 
-instance (Chunk k, Semigroup a) => Semigroup (Acceptor k a) where
+instance (Chunk k, Sem.Semigroup a) => Sem.Semigroup (Acceptor k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
   {-# INLINE (<>) #-}
 
 instance (Chunk k, Monoid a) => Monoid (Acceptor k a) where
   mempty = pure mempty
   {-# INLINE mempty #-}
+
+  mappend = (<>)
+  {-# INLINE mappend #-}
 
 instance Functor (Acceptor k) where
   fmap f p = Acceptor $ \env st ok err ->

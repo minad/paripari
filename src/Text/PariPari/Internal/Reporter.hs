@@ -28,6 +28,7 @@ import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Semigroup as Sem
 import Data.String (IsString(..))
 import GHC.Generics (Generic)
 import Text.PariPari.Internal.Chunk
@@ -86,13 +87,16 @@ newtype Reporter k a = Reporter
                -> b
   }
 
-instance (Chunk k, Semigroup a) => Semigroup (Reporter k a) where
+instance (Chunk k, Sem.Semigroup a) => Sem.Semigroup (Reporter k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
   {-# INLINE (<>) #-}
 
 instance (Chunk k, Monoid a) => Monoid (Reporter k a) where
   mempty = pure mempty
   {-# INLINE mempty #-}
+
+  mappend = (<>)
+  {-# INLINE mappend #-}
 
 instance Chunk k => Functor (Reporter k) where
   fmap f p = Reporter $ \env st ok err ->

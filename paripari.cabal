@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 78092995723d296e73be8c5403a8bf6c7b46bece1826eb1e0841683e3252071d
+-- hash: 3cefc7b68ef2d47349837d0a9c7462724f7de28effd1174e99e9f0ce5e8a63e5
 
 name:           paripari
 version:        0.3.0.0
@@ -17,7 +17,7 @@ maintainer:     Daniel Mendler <mail@daniel-mendler.de>
 copyright:      2018 Daniel Mendler
 license:        MIT
 license-file:   LICENSE
-tested-with:    GHC == 8.4.3, GHC == 8.6.1
+tested-with:    GHC == 8.0.1, GHC == 8.2.1, GHC == 8.4.3, GHC == 8.6.1
 build-type:     Simple
 cabal-version:  >= 1.10
 
