@@ -4,6 +4,7 @@
 {-# LANGUAGE Rank2Types #-}
 
 import System.Environment (getArgs)
+import Data.Semigroup ((<>))
 import Text.PariPari
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
