@@ -392,7 +392,7 @@ runReporterWithOptions o p f k =
   let (b, off, len) = unpackChunk k
   in unReporter p (initialEnv o f b (off + len)) (initialState off) (\x _ -> Right x) (Left . getReport f)
 
--- | Run 'Reporter' on the given 'ByteString', returning either
+-- | Run 'Reporter' on the given chunk, returning either
 -- an error 'Report' or, if successful, the result.
 runReporter :: Chunk k => Reporter k a -> FilePath -> k -> Either Report a
 runReporter = runReporterWithOptions defaultReportOptions

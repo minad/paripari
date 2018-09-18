@@ -16,7 +16,7 @@ import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Reporter
 import GHC.Conc (par)
 
--- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **in parallel**.
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given chunk **in parallel**.
 -- The 'FilePath' is used for error reporting.
 -- When the acceptor does not return successfully, the result from the reporter
 -- is awaited.
@@ -24,7 +24,7 @@ runCharParser :: CharChunk k => (forall p. CharParser k p => p a) -> FilePath ->
 runCharParser = runCharParserWithOptions defaultReportOptions
 {-# INLINE runCharParser #-}
 
--- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **sequentially**.
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given chunk **sequentially**.
 -- The 'FilePath' is used for error reporting.
 -- When the acceptor does not return successfully, the result from the reporter
 -- is awaited.
@@ -52,7 +52,7 @@ runSeqCharParserWithOptions o p f b =
        Right x -> Right x
 {-# INLINE runSeqCharParserWithOptions #-}
 
--- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **in parallel**.
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given chunk **in parallel**.
 -- The 'FilePath' is used for error reporting.
 -- When the acceptor does not return successfully, the result from the reporter
 -- is awaited.
@@ -60,7 +60,7 @@ runChunkParser :: CharChunk k => (forall p. ChunkParser k p => p a) -> FilePath 
 runChunkParser = runCharParserWithOptions defaultReportOptions
 {-# INLINE runChunkParser #-}
 
--- | Run fast 'Acceptor' and slower 'Reporter' on the given 'ByteString' **sequentially**.
+-- | Run fast 'Acceptor' and slower 'Reporter' on the given chunk **sequentially**.
 -- The 'FilePath' is used for error reporting.
 -- When the acceptor does not return successfully, the result from the reporter
 -- is awaited.

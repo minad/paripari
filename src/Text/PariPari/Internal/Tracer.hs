@@ -37,7 +37,7 @@ instance Chunk k => Alternative (Tracer k) where
                next
     in unReporter (unTracer p1) env st ok err'
 
--- | Run 'Tracer' on the given 'ByteString', returning either
+-- | Run 'Tracer' on the given chunk, returning either
 -- an error 'Report' or, if successful, the result.
 runTracer :: Chunk k => Tracer k a -> FilePath -> k -> Either Report a
 runTracer = runReporter . unTracer
