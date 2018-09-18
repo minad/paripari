@@ -34,8 +34,8 @@ module Text.PariPari.Internal.CharCombinators (
   , takeCharsWhile
   , skipCharsWhile1
   , takeCharsWhile1
-  , scanCharsWhile
-  , scanCharsWhile1
+  , scanChars
+  , scanChars1
   , string
 ) where
 
@@ -309,11 +309,11 @@ asciiSatisfy :: CharParser k p => (Word8 -> Bool) -> p Word8
 asciiSatisfy f = asciiScan $ \b -> if f b then Just b else Nothing
 {-# INLINE asciiSatisfy #-}
 
-scanCharsWhile :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
-scanCharsWhile f = go
+scanChars :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanChars f = go
   where go s = (scan (f s) >>= go) <|> pure s
-{-# INLINE scanCharsWhile #-}
+{-# INLINE scanChars #-}
 
-scanCharsWhile1 :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
-scanCharsWhile1 f s = scan (f s) >>= scanCharsWhile f
-{-# INLINE scanCharsWhile1 #-}
+scanChars1 :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanChars1 f s = scan (f s) >>= scanChars f
+{-# INLINE scanChars1 #-}

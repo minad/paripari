@@ -55,8 +55,8 @@ module Text.PariPari.Internal.ElementCombinators (
   , takeElementsWhile
   , skipElementsWhile1
   , takeElementsWhile1
-  , scanElementsWhile
-  , scanElementsWhile1
+  , scanElements
+  , scanElements1
 ) where
 
 import Control.Applicative ((<|>), empty)
@@ -191,11 +191,11 @@ elementSatisfy :: ChunkParser k p => (Element k -> Bool) -> p (Element k)
 elementSatisfy f = elementScan $ \e -> if f e then Just e else Nothing
 {-# INLINE elementSatisfy #-}
 
-scanElementsWhile :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
-scanElementsWhile f = go
+scanElements :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
+scanElements f = go
   where go s = (elementScan (f s) >>= go) <|> pure s
-{-# INLINE scanElementsWhile #-}
+{-# INLINE scanElements #-}
 
-scanElementsWhile1 :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
-scanElementsWhile1 f s = elementScan (f s) >>= scanElementsWhile f
-{-# INLINE scanElementsWhile1 #-}
+scanElements1 :: ChunkParser k p => (s -> Element k -> Maybe s) -> s -> p s
+scanElements1 f s = elementScan (f s) >>= scanElements f
+{-# INLINE scanElements1 #-}

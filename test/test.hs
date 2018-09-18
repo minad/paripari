@@ -661,10 +661,10 @@ ChunkParser:
 elementScan
 
 Element Combinators:
-scanElementsWhile
-scanElementsWhile1
+scanElements
+scanElements1
 
 Char Combinators:
-scanCharsWhile
-scanCharsWhile1
+scanChars
+scanChars1
 -}
