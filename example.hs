@@ -31,7 +31,12 @@ json :: Parser Value
 json = space *> (object <|> array) <?> "json"
 
 object :: Parser Value
-object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
+object = Object <$>
+  (
+    char '{' *>
+    recover (space *> sepBy pair (space *> char ',' *> space) <* space <* char '}')
+    ([] <$ skipCharsWhile (/= '}') <* char '}')
+  ) <?> "object"
 
 pair :: Parser (StringType, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)

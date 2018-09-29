@@ -1,4 +1,5 @@
 {"widget": {
+    "recover": { 123 },
     "debug": "on",
     "window": {
         "title": "Sample Konfabulator Widget",
