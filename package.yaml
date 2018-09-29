@@ -1,5 +1,5 @@
 name: paripari
-version: 0.4.0.0
+version: 0.5.0.0
 synopsis: Parser combinators with fast-path and slower fallback for error reporting
 description: PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter which are evaluated in parallel. If the Acceptor fails, the Reporter returns a report about the parsing errors. Like Attoparsec, the parser combinators backtrack by default.
 category: Text
