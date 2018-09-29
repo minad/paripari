@@ -408,8 +408,8 @@ runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -
 runReporterWithOptions o p f k =
   let (b, off, len) = unpackChunk k
       env = initialEnv o f b (off + len)
-      ok x s = (Just x, _stReports s)
-      err s = (Nothing, _stReports $ addReport env s)
+      ok x s = (Just x, reverse $ _stReports s)
+      err s = (Nothing, reverse $ _stReports $ addReport env s)
   in unReporter p env (initialState off) ok err
 
 -- | Run 'Reporter' on the given chunk, returning the result
