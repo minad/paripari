@@ -149,6 +149,9 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   commit p = p
   {-# INLINE commit #-}
 
+  recover p _ = p
+  {-# INLINE recover #-}
+
   element e = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff < _envEnd env,
          (e', w) <- elementAt @k (_envBuf env) _stOff,

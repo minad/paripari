@@ -42,5 +42,5 @@ instance Chunk k => Alternative (Tracer k) where
 
 -- | Run 'Tracer' on the given chunk, returning either
 -- an error 'Report' or, if successful, the result.
-runTracer :: Chunk k => Tracer k a -> FilePath -> k -> Either Report a
+runTracer :: Chunk k => Tracer k a -> FilePath -> k -> (Maybe a, [Report])
 runTracer = runReporter . unTracer

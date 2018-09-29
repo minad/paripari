@@ -4,6 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 
+import Data.Foldable (for_)
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
@@ -67,10 +68,10 @@ main = do
   args <- getArgs
   case args of
     [file] -> do
-      b <- B.readFile file
-      case runCharParser json file b of
-        Left report -> do
-          putStrLn $ showReport report
-          print $ runTracer json file b
-        Right val -> print val
+      src <- B.readFile file
+      let (result, reports) = runCharParser json file src
+      for_ reports $ putStrLn . showReport
+      case result of
+        Just val -> print val
+        Nothing  -> print $ runTracer json file src
     _ -> error "Usage: paripari-example test.json"

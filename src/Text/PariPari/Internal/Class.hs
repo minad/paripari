@@ -87,6 +87,16 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- of the parser.
   commit :: p a -> p a
 
+  -- | Parse with error recovery.
+  -- If the parser p fails in `recover p r`
+  -- the parser r continues at the position where p failed.
+  -- If the recovering parser r fails too, the whole
+  -- parser fails. The errors reported by the recovering
+  -- parser are ignored in any case.
+  -- Error recovery support is only available
+  -- in the 'Reporter' instance.
+  recover :: p a -> p a -> p a
+
   -- | Parse a single element
   element :: Element k -> p (Element k)
 

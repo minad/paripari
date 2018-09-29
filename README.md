@@ -29,6 +29,7 @@ In general, the interface of PariPari matches mostly the one of Attoparsec/Megap
 * Tracing parser to analyze backtracking
 * Support for strict UTF-8 `ByteString` and strict `Text`
 * Combinators for indentation-sensitive parsing
+* Error recovery support via `recover`
 * Provides flexible parsers for integers and fractional numbers
   of base 2 to 36 with support for separators between digits
 * Most Parsec/Megaparsec combinators provided, relying on the `parser-combinators` library
@@ -53,6 +54,7 @@ Using the preprocessor is not necessary, however without it I observed 2x-4x slo
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 
+import Data.Foldable (for_)
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
@@ -178,12 +180,12 @@ main = do
   args <- getArgs
   case args of
     [file] -> do
-      b <- B.readFile file
-      case runCharParser json file b of
-        Left report -> do
-          putStrLn $ showReport report
-          print $ runTracer json file b
-        Right val -> print val
+      src <- B.readFile file
+      let (result, reports) = runCharParser json file src
+      for_ reports $ putStrLn . showReport
+      case result of
+        Just val -> print val
+        Nothing  -> print $ runTracer json file src
     _ -> error "Usage: paripari-example test.json"
 ```
 

@@ -3,8 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Rank2Types #-}
 
-import System.Environment (getArgs)
+import Data.Foldable (for_)
 import Data.Semigroup ((<>))
+import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
@@ -191,9 +192,11 @@ main = do
   case args of
     [src, _, dst] -> do
       code <- T.readFile src
-      case runCharParser source src code of
-        Left report -> putStrLn $ showReport report
-        Right ls -> do
+      let (result, reports) = runCharParser source src code
+      for_ reports $ putStrLn . showReport
+      case result of
+        Nothing -> pure ()
+        Just ls -> do
           let specialisers = [(from, to) | SpecialiseAll from to <- ls]
               specialisedTypeDecls = concatMap (specialise specialisers) [(n, t) | TypeDecl n t <- ls]
           T.writeFile dst $ T.intercalate "\n" $ map showSource ls <> specialisedTypeDecls

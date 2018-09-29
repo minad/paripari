@@ -28,6 +28,11 @@ randomTries = 1000
 randomStringLen :: Int
 randomStringLen = 1000
 
+runReporterEither :: Chunk k => Reporter k a -> FilePath -> k -> Either [Report] a
+runReporterEither p f k = case runReporter p f k of
+  (Just a, []) -> Right a
+  (_,      r)  -> Left r
+
 -- Only generate valid Unicode characters
 randomChar :: IO Char
 randomChar = do
@@ -52,7 +57,7 @@ tests :: TestTree
 tests = testGroup "Tests"
   [ testGroup "Chunk"
     [ testGroup "Acceptor" $ chunkTests runAcceptor
-    , testGroup "Reporter" $ chunkTests runAcceptor
+    , testGroup "Reporter" $ chunkTests runReporterEither
     ]
 
   , testGroup "Char"
@@ -62,10 +67,12 @@ tests = testGroup "Tests"
       ]
 
     , testGroup "Reporter"
-      [ testGroup "Text"       $ charTests @Text       runReporter
-      , testGroup "ByteString" $ charTests @ByteString runReporter
+      [ testGroup "Text"       $ charTests @Text       runReporterEither
+      , testGroup "ByteString" $ charTests @ByteString runReporterEither
       ]
     ]
+
+  , testGroup "Reporter specific" reporterTests
   ]
 
 charTests :: forall k p e. (CharParser k p, CharChunk k, Eq e, Show e, Show k)
@@ -467,6 +474,11 @@ chunkTests run =
         ok (commit $ element 'a') "abc" 'a'
         err (commit $ element 'b') "abc"
 
+    , testCase "recover" $ do
+        ok (recover (element 'a' <* eof) (element 'b')) "a" 'a'
+        err (recover (element 'a') (element 'b')) "c"
+        err (recover (element 'a' <* eof) (element 'b')) "c"
+
     , testCase "element" $ do
         ok (element 'a') "abc" 'a'
         ok (element 'a' <* eof) "a" 'a'
@@ -638,6 +650,28 @@ chunkTests run =
   ok p i o = run p "filename" i @?= Right o
   err :: (Eq a, Show a, HasCallStack) => p a -> Text -> Assertion
   err p i = assertBool "err" $ isLeft $ run p "filename" i
+
+reporterTests :: [TestTree]
+reporterTests =
+  [ testCase "recover" $ do
+      run (element 'a' <* eof) "a" (Just 'a', 0)
+      run (element 'a') "b" (Nothing, 1)
+      run (recover (element 'a' <* eof) (element 'b')) "a" (Just 'a', 0)
+      run (recover (element 'a') (element 'b')) "b" (Just 'b', 1)
+      run ((,)
+            <$> recover (element 'a') (element 'b')
+            <*> recover (element 'a') (element 'c')) "bc" (Just ('b', 'c'), 2)
+      run (recover (element 'a') (element 'b') *>
+           recover (element 'a') (element 'c') *>
+           element 'a') "bcd" (Nothing, 3)
+      run (recover (element 'a' <* eof) (element 'b')) "c" (Nothing, 1)
+  ]
+  where
+  run :: (Eq a, Show a, HasCallStack) => Reporter Text a -> Text -> (Maybe a, Int) -> Assertion
+  run p i (o, r) = do
+    let (out, rep) = runReporter p "filename" i
+    out @?= o
+    length rep @?= r
 
 {-
 TODO:

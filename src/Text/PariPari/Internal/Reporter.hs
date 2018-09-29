@@ -75,6 +75,7 @@ data State = State
   , _stErrCol    :: !Int
   , _stErrCommit :: !Int
   , _stErrors    :: [ErrorContext]
+  , _stReports   :: [Report]
   }
 
 -- | Parser which is optimised for good error reports.
@@ -191,6 +192,13 @@ instance Chunk k => ChunkParser k (Reporter k) where
     else
       raiseError env st err expectedEnd
   {-# INLINE eof #-}
+
+  recover p r = Reporter $ \env st ok err ->
+    let err1 s =
+          let err2 _ = err s
+          in unReporter r env (addReport env s) ok err2
+    in unReporter p env st ok err1
+  {-# INLINE recover #-}
 
   element e = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
     if | _stOff < _envEnd env,
@@ -396,18 +404,23 @@ defaultReportOptions = ReportOptions
   }
 
 -- | Run 'Reporter' with additional 'ReportOptions'.
-runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> Either Report a
+runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporterWithOptions o p f k =
   let (b, off, len) = unpackChunk k
-  in unReporter p (initialEnv o f b (off + len)) (initialState off) (\x _ -> Right x) (Left . getReport f)
+      env = initialEnv o f b (off + len)
+      ok x s = (Just x, _stReports s)
+      err s = (Nothing, _stReports $ addReport env s)
+  in unReporter p env (initialState off) ok err
 
--- | Run 'Reporter' on the given chunk, returning either
--- an error 'Report' or, if successful, the result.
-runReporter :: Chunk k => Reporter k a -> FilePath -> k -> Either Report a
+-- | Run 'Reporter' on the given chunk, returning the result
+-- if successful and reports from error recoveries.
+-- In the case of an error, 'Nothing' is returned and the 'report' list
+-- is non-empty.
+runReporter :: Chunk k => Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporter = runReporterWithOptions defaultReportOptions
 
-getReport :: FilePath -> State -> Report
-getReport f s = Report f (_stErrLine s) (_stErrCol s) (_stErrors s)
+addReport :: Env k -> State -> State
+addReport e s = s { _stReports = Report (_envFile e) (_stErrLine s) (_stErrCol s) (_stErrors s) : _stReports s }
 
 initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int -> Env k
 initialEnv _envOptions _envFile _envBuf _envEnd = Env
@@ -432,6 +445,7 @@ initialState _stOff = State
   , _stErrCol    = 0
   , _stErrCommit = 0
   , _stErrors    = []
+  , _stReports   = []
   }
 
 -- | Pretty string representation of 'Report'.
