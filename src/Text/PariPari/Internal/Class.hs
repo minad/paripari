@@ -64,13 +64,20 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- | Parser which succeeds at the end of file
   eof :: p ()
 
-  -- | Annotate the given parser with a label
-  -- used for error reporting
+  -- | Annotate the given parser with a label used for error reporting.
+  --
+  -- __Note__: This function has zero cost in the 'Acceptor'. You can
+  -- use it to improve the error reports without slowing
+  -- down the fast path of your parser.
   label :: String -> p a -> p a
 
   -- | Hide errors occurring within the given parser
   -- from the error report. Based on the given
   -- labels an 'Error' is constructed instead.
+  --
+  -- __Note__: This function has zero cost in the 'Acceptor'. You can
+  -- use it to improve the error reports without slowing
+  -- down the fast path of your parser.
   hidden :: p a -> p a
 
   -- | Commit to the given branch, increasing
@@ -82,9 +89,13 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- libraries, which decreases the error priority
   -- within the given branch (and usually also influences backtracking).
   --
-  -- __Note__: `commit` only applies to the reported
+  -- `commit` only applies to the reported
   -- errors, it has no effect on the backtracking behavior
   -- of the parser.
+  --
+  -- __Note__: This function has zero cost in the 'Acceptor'. You can
+  -- use it to improve the error reports without slowing
+  -- down the fast path of your parser.
   commit :: p a -> p a
 
   -- | Parse with error recovery.
@@ -95,6 +106,10 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- parser are ignored in any case.
   -- Error recovery support is only available
   -- in the 'Reporter' instance.
+  --
+  -- __Note__: This function has zero cost in the 'Acceptor'. You can
+  -- use it to improve the error reports without slowing
+  -- down the fast path of your parser.
   recover :: p a -> p a -> p a
 
   -- | Parse a single element
