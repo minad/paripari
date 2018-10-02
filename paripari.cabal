@@ -2,7 +2,7 @@
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3476d5605ed3319d3b575839fb866897fc42c60890869a31d03de49938e4d20d
+-- hash: 71bd01a407c9c51299944a3a3739b27d8b603cbf8edda5634051c28f14a941cb
 
 name:           paripari
 version:        0.5.0.0
@@ -36,6 +36,7 @@ library
       Text.PariPari.Internal.Reporter
       Text.PariPari.Internal.Run
       Text.PariPari.Internal.Tracer
+      Text.PariPari.Lens
   other-modules:
       Paths_paripari
   hs-source-dirs:

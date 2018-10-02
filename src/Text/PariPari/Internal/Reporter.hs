@@ -50,29 +50,29 @@ data ReportOptions = ReportOptions
 data Report = Report
   { _reportFile   :: !FilePath
   , _reportLine   :: !Int
-  , _reportCol    :: !Int
+  , _reportColumn :: !Int
   , _reportErrors :: [ErrorContext]
   } deriving (Eq, Show, Generic)
 
 data Env k = Env
-  { _envBuf     :: !(Buffer k)
-  , _envEnd     :: !Int
-  , _envFile    :: !FilePath
-  , _envOptions :: !ReportOptions
-  , _envHidden  :: !Bool
-  , _envCommit  :: !Int
-  , _envContext :: [String]
-  , _envRefLine :: !Int
-  , _envRefCol  :: !Int
+  { _envBuf       :: !(Buffer k)
+  , _envEnd       :: !Int
+  , _envFile      :: !FilePath
+  , _envOptions   :: !ReportOptions
+  , _envHidden    :: !Bool
+  , _envCommit    :: !Int
+  , _envContext   :: [String]
+  , _envRefLine   :: !Int
+  , _envRefColumn :: !Int
   }
 
 data State = State
   { _stOff       :: !Int
   , _stLine      :: !Int
-  , _stCol       :: !Int
+  , _stColumn    :: !Int
   , _stErrOff    :: !Int
   , _stErrLine   :: !Int
-  , _stErrCol    :: !Int
+  , _stErrColumn :: !Int
   , _stErrCommit :: !Int
   , _stErrors    :: [ErrorContext]
   , _stReports   :: [Report]
@@ -151,16 +151,16 @@ instance Chunk k => Fail.MonadFail (Reporter k) where
   {-# INLINE fail #-}
 
 instance Chunk k => ChunkParser k (Reporter k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
+  getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefColumn env)
   {-# INLINE getRefPos #-}
 
-  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefColumn = _stColumn st }) p
   {-# INLINE withRefPos #-}
 
   label l p = local (const $ addLabel l) p
@@ -200,33 +200,33 @@ instance Chunk k => ChunkParser k (Reporter k) where
     in unReporter p env st ok err1
   {-# INLINE recover #-}
 
-  element e = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  element e = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | _stOff < _envEnd env,
          (e', w) <- elementAt @k (_envBuf env) _stOff,
          e == e',
-         pos <- elementPos @k e (Pos _stLine _stCol) ->
-           ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+         pos <- elementPos @k e (Pos _stLine _stColumn) ->
+           ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
        | otherwise ->
            raiseError env st err $ EExpected [showElement @k e]
   {-# INLINE element #-}
 
-  elementScan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  elementScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     let (e, w) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env ->
               raiseError env st err unexpectedEnd
           | _stOff < _envEnd env,
             Just r <- f e,
-            pos <- elementPos @k e (Pos _stLine _stCol) ->
-              ok r st { _stOff =_stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+            pos <- elementPos @k e (Pos _stLine _stColumn) ->
+              ok r st { _stOff =_stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
           | otherwise ->
               raiseError env st err $ EUnexpected $ showElement @k e
   {-# INLINE elementScan #-}
 
-  chunk k = Reporter $ \env st@State{_stOff,_stCol} ok err ->
+  chunk k = Reporter $ \env st@State{_stOff,_stColumn} ok err ->
     let n = chunkWidth @k k
     in if n + _stOff <= _envEnd env &&
           chunkEqual @k (_envBuf env) _stOff k then
-         ok k st { _stOff = _stOff + n, _stCol = _stCol + n }
+         ok k st { _stOff = _stOff + n, _stColumn = _stColumn + n }
        else
          raiseError env st err $ EExpected [showChunk @k k]
   {-# INLINE chunk #-}
@@ -240,7 +240,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
   {-# INLINE asChunk #-}
 
 instance CharChunk k => CharParser k (Reporter k) where
-  scan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0' ->
            case f c of
@@ -248,7 +248,7 @@ instance CharChunk k => CharParser k (Reporter k) where
                ok r st
                { _stOff = _stOff + w
                , _stLine = if c == '\n' then _stLine + 1 else _stLine
-               , _stCol = if c == '\n' then 1 else _stCol + 1
+               , _stColumn = if c == '\n' then 1 else _stColumn + 1
                }
              Nothing ->
                raiseError env st err $ EUnexpected $ show c
@@ -263,18 +263,18 @@ instance CharChunk k => CharParser k (Reporter k) where
   char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
   char c
     | w <- charWidth @k c =
-        Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
         if charAtFixed @k w (_envBuf env) _stOff == c then
           ok c st
           { _stOff = _stOff + w
           , _stLine = if c == '\n' then _stLine + 1 else _stLine
-          , _stCol = if c == '\n' then 1 else _stCol + 1
+          , _stColumn = if c == '\n' then 1 else _stColumn + 1
           }
         else
           raiseError env st err $ EExpected [show c]
   {-# INLINE char #-}
 
-  asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     let b = byteAt @k (_envBuf env) _stOff
     in if | b /= 0,
             b < 128,
@@ -282,7 +282,7 @@ instance CharChunk k => CharParser k (Reporter k) where
               ok x st
               { _stOff = _stOff + 1
               , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b == asc_newline then 1 else _stCol + 1
+              , _stColumn = if b == asc_newline then 1 else _stColumn + 1
               }
           | _stOff >= _envEnd env ->
               raiseError env st err unexpectedEnd
@@ -293,12 +293,12 @@ instance CharChunk k => CharParser k (Reporter k) where
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
-    | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
         if byteAt @k (_envBuf env) _stOff == b then
           ok b st
           { _stOff = _stOff + 1
           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-          , _stCol = if b == asc_newline then 1 else _stCol + 1
+          , _stColumn = if b == asc_newline then 1 else _stColumn + 1
           }
         else
           raiseError env st err $ EExpected [showByte b]
@@ -340,7 +340,7 @@ addError env st e
       st { _stErrors    = [e']
          , _stErrOff    = _stOff st
          , _stErrLine   = _stLine st
-         , _stErrCol    = _stCol st
+         , _stErrColumn = _stColumn st
          , _stErrCommit = _envCommit env
          }
   | _stOff st == _stErrOff st && _envCommit env == _stErrCommit st,
@@ -363,7 +363,7 @@ mergeErrorState env s s'
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
         , _stErrLine   = _stErrLine s'
-        , _stErrCol    = _stErrCol s'
+        , _stErrColumn = _stErrColumn s'
         , _stErrCommit = _stErrCommit s'
         }
   | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
@@ -420,7 +420,7 @@ runReporter :: Chunk k => Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporter = runReporterWithOptions defaultReportOptions
 
 addReport :: Env k -> State -> State
-addReport e s = s { _stReports = Report (_envFile e) (_stErrLine s) (_stErrCol s) (_stErrors s) : _stReports s }
+addReport e s = s { _stReports = Report (_envFile e) (_stErrLine s) (_stErrColumn s) (_stErrors s) : _stReports s }
 
 initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int -> Env k
 initialEnv _envOptions _envFile _envBuf _envEnd = Env
@@ -428,21 +428,21 @@ initialEnv _envOptions _envFile _envBuf _envEnd = Env
   , _envBuf
   , _envOptions
   , _envEnd
-  , _envContext = []
-  , _envHidden  = False
-  , _envCommit  = 0
-  , _envRefLine = 1
-  , _envRefCol  = 1
+  , _envContext   = []
+  , _envHidden    = False
+  , _envCommit    = 0
+  , _envRefLine   = 1
+  , _envRefColumn = 1
   }
 
 initialState :: Int -> State
 initialState _stOff = State
   { _stOff
   , _stLine      = 1
-  , _stCol       = 1
+  , _stColumn    = 1
   , _stErrOff    = 0
   , _stErrLine   = 0
-  , _stErrCol    = 0
+  , _stErrColumn = 0
   , _stErrCommit = 0
   , _stErrors    = []
   , _stReports   = []
@@ -453,7 +453,7 @@ showReport :: Report -> String
 showReport r =
   "Parser errors at " <> _reportFile r
   <> ", line " <> show (_reportLine r)
-  <> ", column " <> show (_reportCol r)
+  <> ", column " <> show (_reportColumn r)
   <> "\n\n" <> showErrors (_reportErrors r)
 
 -- | Pretty string representation of '[ErrorContext]'.

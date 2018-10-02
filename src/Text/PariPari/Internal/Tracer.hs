@@ -34,7 +34,7 @@ instance Chunk k => Alternative (Tracer k) where
               next  = unReporter (unTracer p2) env (mergeErrorState env st s) ok err
           in if width > 1 then
                trace ("Backtracking " <> show width <> " bytes at line " <> show (_stLine s)
-                       <> ", column " <> show (_stCol s) <> ", context " <> show (_envContext env) <> ": "
+                       <> ", column " <> show (_stColumn s) <> ", context " <> show (_envContext env) <> ": "
                        <> showChunk (packChunk @k (_envBuf env) (_stOff st) width)) next
              else
                next

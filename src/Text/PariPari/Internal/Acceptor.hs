@@ -22,17 +22,17 @@ import Text.PariPari.Internal.Class
 import qualified Control.Monad.Fail as Fail
 
 data Env k = Env
-  { _envBuf     :: !(Buffer k)
-  , _envEnd     :: !Int
-  , _envFile    :: !FilePath
-  , _envRefLine :: !Int
-  , _envRefCol  :: !Int
+  { _envBuf       :: !(Buffer k)
+  , _envEnd       :: !Int
+  , _envFile      :: !FilePath
+  , _envRefLine   :: !Int
+  , _envRefColumn :: !Int
   }
 
 data State = State
-  { _stOff     :: !Int
-  , _stLine    :: !Int
-  , _stCol     :: !Int
+  { _stOff    :: !Int
+  , _stLine   :: !Int
+  , _stColumn :: !Int
   }
 
 -- | Parser which is optimised for fast parsing. Error reporting
@@ -107,16 +107,16 @@ instance Chunk k => Fail.MonadFail (Acceptor k) where
   {-# INLINE fail #-}
 
 instance Chunk k => ChunkParser k (Acceptor k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
+  getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefColumn env)
   {-# INLINE getRefPos #-}
 
-  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefColumn = _stColumn st }) p
   {-# INLINE withRefPos #-}
 
   notFollowedBy p = Acceptor $ \env st ok err ->
@@ -152,31 +152,31 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   recover p _ = p
   {-# INLINE recover #-}
 
-  element e = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  element e = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | _stOff < _envEnd env,
          (e', w) <- elementAt @k (_envBuf env) _stOff,
          e == e',
-         pos <- elementPos @k e (Pos _stLine _stCol) ->
-           ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+         pos <- elementPos @k e (Pos _stLine _stColumn) ->
+           ok e st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
        | otherwise ->
            err $ ECombinator "element"
   {-# INLINE element #-}
 
-  elementScan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  elementScan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | _stOff < _envEnd env,
          (e, w) <- elementAt @k (_envBuf env) _stOff,
          Just r <- f e,
-         pos <- elementPos @k e (Pos _stLine _stCol) ->
-           ok r st { _stOff = _stOff + w, _stLine = _posLine pos, _stCol = _posColumn pos }
+         pos <- elementPos @k e (Pos _stLine _stColumn) ->
+           ok r st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
        | otherwise ->
            err $ ECombinator "elementScan"
   {-# INLINE elementScan #-}
 
-  chunk k = Acceptor $ \env st@State{_stOff,_stCol} ok err ->
+  chunk k = Acceptor $ \env st@State{_stOff,_stColumn} ok err ->
     let n = chunkWidth @k k
     in if n + _stOff <= _envEnd env &&
           chunkEqual @k (_envBuf env) _stOff k then
-         ok k st { _stOff = _stOff + n, _stCol = _stCol + n }
+         ok k st { _stOff = _stOff + n, _stColumn = _stColumn + n }
        else
          err $ ECombinator "chunk"
   {-# INLINE chunk #-}
@@ -190,14 +190,14 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   {-# INLINE asChunk #-}
 
 instance CharChunk k => CharParser k (Acceptor k) where
-  scan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  scan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
          Just r <- f c ->
            ok r st
            { _stOff = _stOff + w
            , _stLine = if c == '\n' then _stLine + 1 else _stLine
-           , _stCol = if c == '\n' then 1 else _stCol + 1
+           , _stColumn = if c == '\n' then 1 else _stColumn + 1
            }
        | otherwise ->
            err $ ECombinator "scan"
@@ -208,18 +208,18 @@ instance CharChunk k => CharParser k (Acceptor k) where
   char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
   char c
     | w <- charWidth @k c =
-        Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
         if charAtFixed @k w (_envBuf env) _stOff == c then
           ok c st
           { _stOff = _stOff + w
           , _stLine = if c == '\n' then _stLine + 1 else _stLine
-          , _stCol = if c == '\n' then 1 else _stCol + 1
+          , _stColumn = if c == '\n' then 1 else _stColumn + 1
           }
         else
           err $ ECombinator "char"
   {-# INLINE char #-}
 
-  asciiScan f = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+  asciiScan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | b <- byteAt @k (_envBuf env) _stOff,
          b /= 0,
          b < 128,
@@ -227,7 +227,7 @@ instance CharChunk k => CharParser k (Acceptor k) where
            ok x st
            { _stOff = _stOff + 1
            , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-           , _stCol = if b == asc_newline then 1 else _stCol + 1
+           , _stColumn = if b == asc_newline then 1 else _stColumn + 1
            }
        | otherwise ->
            err $ ECombinator "asciiScan"
@@ -236,12 +236,12 @@ instance CharChunk k => CharParser k (Acceptor k) where
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
-    | otherwise = Acceptor $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    | otherwise = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
         if byteAt @k (_envBuf env) _stOff == b then
           ok b st
           { _stOff = _stOff + 1
           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-          , _stCol = if b == asc_newline then 1 else _stCol + 1
+          , _stColumn = if b == asc_newline then 1 else _stColumn + 1
           }
         else
           err $ ECombinator "asciiByte"
@@ -275,12 +275,12 @@ initialEnv _envFile _envBuf _envEnd = Env
   , _envFile
   , _envEnd
   , _envRefLine = 1
-  , _envRefCol = 1
+  , _envRefColumn = 1
   }
 
 initialState :: Int -> State
 initialState _stOff = State
   { _stOff
   , _stLine = 1
-  , _stCol = 1
+  , _stColumn = 1
   }
