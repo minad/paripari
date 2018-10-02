@@ -414,7 +414,7 @@ runReporterWithOptions o p f k =
 
 -- | Run 'Reporter' on the given chunk, returning the result
 -- if successful and reports from error recoveries.
--- In the case of an error, 'Nothing' is returned and the 'report' list
+-- In the case of an error, 'Nothing' is returned and the 'Report' list
 -- is non-empty.
 runReporter :: Chunk k => Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporter = runReporterWithOptions defaultReportOptions

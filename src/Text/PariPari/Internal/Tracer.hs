@@ -40,7 +40,9 @@ instance Chunk k => Alternative (Tracer k) where
                next
     in unReporter (unTracer p1) env st ok err'
 
--- | Run 'Tracer' on the given chunk, returning either
--- an error 'Report' or, if successful, the result.
+-- | Run 'Tracer' on the given chunk, returning the result
+-- if successful and reports from error recoveries.
+-- In the case of an error, 'Nothing' is returned and the 'Report' list
+-- is non-empty.
 runTracer :: Chunk k => Tracer k a -> FilePath -> k -> (Maybe a, [Report])
 runTracer = runReporter . unTracer
