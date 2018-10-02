@@ -108,7 +108,7 @@ withPos p = do
 
 type Span = (Pos, Pos)
 
--- | Decoreate the parser result with the position span
+-- | Decorate the parser result with the position span
 withSpan :: ChunkParser k p => p a -> p (Span, a)
 withSpan p = do
   begin <- getPos
