@@ -1,13 +1,13 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3e3b454317d55bfd8b2193634bfbd59af8a423557c83bf0f1c17eb490ffcd209
+-- hash: e2aa081115e4cfadf8c060813b3ede4ab8a817542bc9d7f33fa82a04ee85da38
 
 name:           paripari
-version:        0.6.0.0
+version:        0.6.0.1
 synopsis:       Parser combinators with fast-path and slower fallback for error reporting
 description:    PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter which are evaluated in parallel. If the Acceptor fails, the Reporter returns a report about the parsing errors. Like Attoparsec, the parser combinators backtrack by default.
 category:       Text
@@ -46,7 +46,7 @@ library
   build-depends:
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
-    , parser-combinators >=1.0 && <1.2
+    , parser-combinators >=1.0 && <1.3
     , text >=0.11 && <1.3
   default-language: Haskell2010
 
@@ -59,7 +59,7 @@ executable paripari-example
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
     , paripari
-    , parser-combinators >=1.0 && <1.2
+    , parser-combinators >=1.0 && <1.3
     , text >=0.11 && <1.3
   default-language: Haskell2010
 
@@ -72,7 +72,7 @@ executable paripari-specialise-all
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
     , paripari
-    , parser-combinators >=1.0 && <1.2
+    , parser-combinators >=1.0 && <1.3
     , text >=0.11 && <1.3
   default-language: Haskell2010
 
@@ -88,7 +88,7 @@ test-suite test
       base >=4.8 && <5
     , bytestring >=0.10 && <0.11
     , paripari
-    , parser-combinators >=1.0 && <1.2
+    , parser-combinators >=1.0 && <1.3
     , random
     , tasty
     , tasty-hunit

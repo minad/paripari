@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -99,8 +100,10 @@ instance Chunk k => Monad (Acceptor k) where
     in unAcceptor p env st ok' err
   {-# INLINE (>>=) #-}
 
-  fail msg = Fail.fail msg
+#if !MIN_VERSION_base(4,11,0)
+  fail = Fail.fail
   {-# INLINE fail #-}
+#endif
 
 instance Chunk k => Fail.MonadFail (Acceptor k) where
   fail msg = failWith $ EFail msg

@@ -12,3 +12,4 @@ wip
 *.hi
 *~
 *#
+stack.yaml.lock

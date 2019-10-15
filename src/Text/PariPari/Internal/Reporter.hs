@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -143,8 +144,10 @@ instance Chunk k => Monad (Reporter k) where
     in unReporter p env st ok' err
   {-# INLINE (>>=) #-}
 
-  fail msg = Fail.fail msg
+#if !MIN_VERSION_base(4,11,0)
+  fail = Fail.fail
   {-# INLINE fail #-}
+#endif
 
 instance Chunk k => Fail.MonadFail (Reporter k) where
   fail msg = failWith $ EFail msg
