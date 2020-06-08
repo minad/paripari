@@ -35,8 +35,8 @@ import qualified Data.Text.Internal as T
 
 -- | Line and column position starting at (1,1)
 data Pos = Pos
-  { _posLine   :: !Int
-  , _posColumn :: !Int
+  { _posLine   :: {-#UNPACK#-}!Int
+  , _posColumn :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 class (Ord (Element k), Ord k) => Chunk k where

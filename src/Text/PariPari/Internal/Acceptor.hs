@@ -24,16 +24,16 @@ import qualified Control.Monad.Fail as Fail
 
 data Env k = Env
   { _envBuf       :: !(Buffer k)
-  , _envEnd       :: !Int
   , _envFile      :: !FilePath
-  , _envRefLine   :: !Int
-  , _envRefColumn :: !Int
+  , _envEnd       :: {-#UNPACK#-}!Int
+  , _envRefLine   :: {-#UNPACK#-}!Int
+  , _envRefColumn :: {-#UNPACK#-}!Int
   }
 
 data State = State
-  { _stOff    :: !Int
-  , _stLine   :: !Int
-  , _stColumn :: !Int
+  { _stOff    :: {-#UNPACK#-}!Int
+  , _stLine   :: {-#UNPACK#-}!Int
+  , _stColumn :: {-#UNPACK#-}!Int
   }
 
 -- | Parser which is optimised for fast parsing. Error reporting

@@ -29,9 +29,9 @@ data Error
   | EExpected         [String]
   | EUnexpected       String
   | EFail             String
-  | EIndentNotAligned !Int !Int
-  | EIndentOverLine   !Int !Int
-  | ENotEnoughIndent  !Int !Int
+  | EIndentNotAligned {-#UNPACK#-}!Int {-#UNPACK#-}!Int
+  | EIndentOverLine   {-#UNPACK#-}!Int {-#UNPACK#-}!Int
+  | ENotEnoughIndent  {-#UNPACK#-}!Int {-#UNPACK#-}!Int
   deriving (Eq, Ord, Show, Generic)
 
 -- | Parser class, which specifies the necessary

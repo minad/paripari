@@ -43,38 +43,38 @@ data ErrorContext = ErrorContext
   } deriving (Eq, Show, Generic)
 
 data ReportOptions = ReportOptions
-  { _optMaxContexts         :: !Int
-  , _optMaxErrorsPerContext :: !Int
-  , _optMaxLabelsPerContext :: !Int
+  { _optMaxContexts         :: {-#UNPACK#-}!Int
+  , _optMaxErrorsPerContext :: {-#UNPACK#-}!Int
+  , _optMaxLabelsPerContext :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 data Report = Report
   { _reportFile   :: !FilePath
-  , _reportLine   :: !Int
-  , _reportColumn :: !Int
   , _reportErrors :: [ErrorContext]
+  , _reportLine   :: {-#UNPACK#-}!Int
+  , _reportColumn :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 data Env k = Env
   { _envBuf       :: !(Buffer k)
-  , _envEnd       :: !Int
   , _envFile      :: !FilePath
   , _envOptions   :: !ReportOptions
   , _envHidden    :: !Bool
-  , _envCommit    :: !Int
   , _envContext   :: [String]
-  , _envRefLine   :: !Int
-  , _envRefColumn :: !Int
+  , _envCommit    :: {-#UNPACK#-}!Int
+  , _envEnd       :: {-#UNPACK#-}!Int
+  , _envRefLine   :: {-#UNPACK#-}!Int
+  , _envRefColumn :: {-#UNPACK#-}!Int
   }
 
 data State = State
-  { _stOff       :: !Int
-  , _stLine      :: !Int
-  , _stColumn    :: !Int
-  , _stErrOff    :: !Int
-  , _stErrLine   :: !Int
-  , _stErrColumn :: !Int
-  , _stErrCommit :: !Int
+  { _stOff       :: {-#UNPACK#-}!Int
+  , _stLine      :: {-#UNPACK#-}!Int
+  , _stColumn    :: {-#UNPACK#-}!Int
+  , _stErrOff    :: {-#UNPACK#-}!Int
+  , _stErrLine   :: {-#UNPACK#-}!Int
+  , _stErrColumn :: {-#UNPACK#-}!Int
+  , _stErrCommit :: {-#UNPACK#-}!Int
   , _stErrors    :: [ErrorContext]
   , _stReports   :: [Report]
   }
@@ -423,7 +423,10 @@ runReporter :: Chunk k => Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporter = runReporterWithOptions defaultReportOptions
 
 addReport :: Env k -> State -> State
-addReport e s = s { _stReports = Report (_envFile e) (_stErrLine s) (_stErrColumn s) (_stErrors s) : _stReports s }
+addReport e s = s { _stReports = Report { _reportFile = _envFile e
+                                        , _reportErrors = _stErrors s
+                                        , _reportLine = _stErrLine s
+                                        , _reportColumn = _stErrColumn s } : _stReports s }
 
 initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int -> Env k
 initialEnv _envOptions _envFile _envBuf _envEnd = Env
