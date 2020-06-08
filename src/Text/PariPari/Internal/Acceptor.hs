@@ -6,6 +6,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Text.PariPari.Internal.Acceptor (
   Acceptor(..)
   , Env(..)
@@ -151,7 +152,7 @@ instance Chunk k => ChunkParser k (Acceptor k) where
 
   element e = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
     if | _stOff < _envEnd env,
-         (e', w) <- elementAt @k (_envBuf env) _stOff,
+         (# e', w #) <- elementAt @k (_envBuf env) _stOff,
          e == e',
          pos <- elementPos @k e (Pos _stLine _stColumn) ->
            Just (st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }, e)
@@ -161,7 +162,7 @@ instance Chunk k => ChunkParser k (Acceptor k) where
 
   elementScan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
     if | _stOff < _envEnd env,
-         (e, w) <- elementAt @k (_envBuf env) _stOff,
+         (# e, w #) <- elementAt @k (_envBuf env) _stOff,
          Just r <- f e,
          pos <- elementPos @k e (Pos _stLine _stColumn) ->
            Just (st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }, r)
@@ -188,7 +189,7 @@ instance Chunk k => ChunkParser k (Acceptor k) where
 
 instance Chars k => CharsParser k (Acceptor k) where
   scan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
-    if | (c, w) <- charAt @k (_envBuf env) _stOff,
+    if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
          Just r <- f c ->
            Just (st
@@ -260,7 +261,7 @@ local f p = Acceptor $ \env st ->
 -- a simple 'Error' or, if successful, the result.
 runAcceptor :: Chunk k => Acceptor k a -> FilePath -> k -> Maybe a
 runAcceptor p f k =
-  let (b, off, len) = unpackChunk k
+  let (# b, off, len #) = unpackChunk k
   in snd <$> unAcceptor p (initialEnv f b (off + len)) (initialState off)
 
 initialEnv :: FilePath -> Buffer k -> Int -> Env k

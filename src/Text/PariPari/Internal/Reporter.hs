@@ -7,6 +7,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Text.PariPari.Internal.Reporter (
   Reporter(..)
   , Env(..)
@@ -205,7 +206,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
 
   element e = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | _stOff < _envEnd env,
-         (e', w) <- elementAt @k (_envBuf env) _stOff,
+         (# e', w #) <- elementAt @k (_envBuf env) _stOff,
          e == e',
          pos <- elementPos @k e (Pos _stLine _stColumn) ->
            ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
@@ -214,7 +215,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
   {-# INLINE element #-}
 
   elementScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    let (e, w) = elementAt @k (_envBuf env) _stOff
+    let (# e, w #) = elementAt @k (_envBuf env) _stOff
     in if | _stOff >= _envEnd env ->
               raiseError env st err unexpectedEnd
           | _stOff < _envEnd env,
@@ -244,7 +245,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
 
 instance Chars k => CharsParser k (Reporter k) where
   scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    if | (c, w) <- charAt @k (_envBuf env) _stOff,
+    if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
          c /= '\0' ->
            case f c of
              Just r ->
@@ -409,7 +410,7 @@ defaultReportOptions = ReportOptions
 -- | Run 'Reporter' with additional 'ReportOptions'.
 runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporterWithOptions o p f k =
-  let (b, off, len) = unpackChunk k
+  let (# b, off, len #) = unpackChunk k
       env = initialEnv o f b (off + len)
       ok x s = (Just x, reverse $ _stReports s)
       err s = (Nothing, reverse $ _stReports $ addReport env s)

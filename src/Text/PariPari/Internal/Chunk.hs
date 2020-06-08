@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
 module Text.PariPari.Internal.Chunk (
   Chunk(..)
   , Chars(..)
@@ -41,18 +42,18 @@ data Pos = Pos
 class (Ord (Element k), Ord k) => Chunk k where
   type Element  k
   type Buffer   k
-  elementAt :: Buffer k -> Int -> (Element k, Int)
+  elementAt :: Buffer k -> Int -> (# Element k, Int #)
   elementPos :: Element k -> Pos -> Pos
   chunkWidth :: k -> Int
   chunkEqual :: Buffer k -> Int -> k -> Bool
   packChunk :: Buffer k -> Int -> Int -> k
-  unpackChunk :: k -> (Buffer k, Int, Int)
+  unpackChunk :: k -> (# Buffer k, Int, Int #)
   showElement :: Element k -> String
   showChunk :: k -> String
 
 class Chunk k => Chars k where
   byteAt :: Buffer k -> Int -> Word8
-  charAt :: Buffer k -> Int -> (Char, Int)
+  charAt :: Buffer k -> Int -> (# Char, Int #)
   charAtFixed :: Int -> Buffer k -> Int -> Char
   charWidth :: Char -> Int
   stringToChunk :: String -> k
@@ -61,7 +62,7 @@ instance Chunk ByteString where
   type Element  ByteString = Word8
   type Buffer   ByteString = ForeignPtr Word8
 
-  elementAt b i = (ptrByteAt b i, 1)
+  elementAt b i = (# ptrByteAt b i, 1 #)
   {-# INLINE elementAt #-}
 
   elementPos e (Pos l c) =
@@ -80,7 +81,7 @@ instance Chunk ByteString where
 
   unpackChunk k =
     let (B.PS b i n) = k <> fromString "\0\0\0" -- sentinel
-    in (b, i, n - 3)
+    in (# b, i, n - 3 #)
   {-# INLINE unpackChunk #-}
 
   showElement = showByte
@@ -125,7 +126,7 @@ instance Chunk Text where
 
   unpackChunk k =
     let (T.Text b i n) = k <> fromString "\0" -- sentinel
-    in (b, i, n - 1)
+    in (# b, i, n - 1 #)
   {-# INLINE unpackChunk #-}
 
   showElement = show
@@ -141,7 +142,7 @@ instance Chars Text where
   charWidth = charWidthUtf16
   {-# INLINE charWidth #-}
 
-  charAtFixed n b i = fst $ arrayCharAt n b i
+  charAtFixed n b i = case arrayCharAt n b i of (# x, _ #) -> x
   {-# INLINE charAtFixed #-}
 
   stringToChunk t = fromString t
@@ -153,16 +154,16 @@ arrayByteAt a i
   | otherwise = 0
 {-# INLINE arrayByteAt #-}
 
-arrayCharAt :: Int -> T.Array -> Int -> (Char, Int)
+arrayCharAt :: Int -> T.Array -> Int -> (# Char, Int #)
 arrayCharAt 1 a i
-  | c <- T.unsafeIndex a i, c < 0xD800 || c > 0xDFFF = (unsafeChr $ fromIntegral c, 1)
-  | otherwise = ('\0', 0)
+  | c <- T.unsafeIndex a i, c < 0xD800 || c > 0xDFFF = (# unsafeChr $ fromIntegral c, 1 #)
+  | otherwise = (# '\0', 0 #)
 arrayCharAt _ a i
   | hi <- T.unsafeIndex a i, lo <- T.unsafeIndex a (i + 1) =
       if hi < 0xD800 || hi > 0xDFFF then
-        (unsafeChr $ fromIntegral hi, 1)
+        (# unsafeChr $ fromIntegral hi, 1 #)
       else
-        (unsafeChr $ 0x10000 + ((fromIntegral $ hi - 0xD800) `unsafeShiftL` 10) + (fromIntegral lo - 0xDC00), 2)
+        (# unsafeChr $ 0x10000 + ((fromIntegral $ hi - 0xD800) `unsafeShiftL` 10) + (fromIntegral lo - 0xDC00), 2 #)
 {-# INLINE arrayCharAt #-}
 
 ptrBytesEqual :: ForeignPtr Word8 -> Int -> ForeignPtr Word8 -> Int -> Int -> Bool
@@ -183,33 +184,33 @@ at p i = fromIntegral $ ptrByteAt p i
 {-# INLINE at #-}
 
 -- | Decode UTF-8 character at the given offset relative to the pointer
-ptrDecodeUtf8 :: ForeignPtr Word8 -> Int -> (Char, Int)
+ptrDecodeUtf8 :: ForeignPtr Word8 -> Int -> (# Char, Int #)
 ptrDecodeUtf8 p i
   | a1 <- at p i,
     a1 <= 0x7F =
-    (unsafeChr a1, 1)
+    (# unsafeChr a1, 1 #)
   | a1 <- at p i, a2 <- at p (i + 1),
     (a1 .&. 0xE0) == 0xC0,
     (a2 .&. 0xC0) == 0x80 =
-    (unsafeChr (((a1 .&. 31) `unsafeShiftL` 6)
-                .|. (a2 .&. 0x3F)), 2)
+    (# unsafeChr (((a1 .&. 31) `unsafeShiftL` 6)
+                  .|. (a2 .&. 0x3F)), 2 #)
   | a1 <- at p i, a2 <- at p (i + 1), a3 <- at p (i + 2),
     (a1 .&. 0xF0) == 0xE0,
     (a2 .&. 0xC0) == 0x80,
     (a3 .&. 0xC0) == 0x80 =
-    (unsafeChr (((a1 .&. 15) `unsafeShiftL` 12)
-                 .|. ((a2 .&. 0x3F) `unsafeShiftL` 6)
-                 .|. (a3 .&. 0x3F)), 3)
+    (# unsafeChr (((a1 .&. 15) `unsafeShiftL` 12)
+                  .|. ((a2 .&. 0x3F) `unsafeShiftL` 6)
+                  .|. (a3 .&. 0x3F)), 3 #)
   | a1 <- at p i, a2 <- at p (i + 1), a3 <- at p (i + 2), a4 <- at p (i + 3),
     (a1 .&. 0xF8) == 0xF0,
     (a2 .&. 0xC0) == 0x80,
     (a3 .&. 0xC0) == 0x80,
     (a4 .&. 0xC0) == 0x80 =
-    (unsafeChr (((a1 .&. 7) `unsafeShiftL` 18)
-                 .|. ((a2 .&. 0x3F) `unsafeShiftL` 12)
-                 .|. ((a3 .&. 0x3F) `unsafeShiftL` 6)
-                 .|. (a4 .&. 0x3F)), 4)
-  | otherwise = ('\0', 0)
+    (# unsafeChr (((a1 .&. 7) `unsafeShiftL` 18)
+                  .|. ((a2 .&. 0x3F) `unsafeShiftL` 12)
+                  .|. ((a3 .&. 0x3F) `unsafeShiftL` 6)
+                  .|. (a4 .&. 0x3F)), 4 #)
+  | otherwise = (# '\0', 0 #)
 {-# INLINE ptrDecodeUtf8 #-}
 
 -- | Decode UTF-8 character with fixed width at the given offset relative to the pointer
