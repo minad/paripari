@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Text.PariPari.Internal.Chunk (
   Chunk(..)
-  , CharChunk(..)
+  , Chars(..)
   , Pos(..)
   , showByte
   , showByteString
@@ -16,7 +16,6 @@ module Text.PariPari.Internal.Chunk (
 import Data.Bits (unsafeShiftL, (.|.), (.&.))
 import Data.ByteString (ByteString)
 import Data.Foldable (foldl')
-import Data.Semigroup ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import Data.Word (Word8)
@@ -51,7 +50,7 @@ class (Ord (Element k), Ord k) => Chunk k where
   showElement :: Element k -> String
   showChunk :: k -> String
 
-class Chunk k => CharChunk k where
+class Chunk k => Chars k where
   byteAt :: Buffer k -> Int -> Word8
   charAt :: Buffer k -> Int -> (Char, Int)
   charAtFixed :: Int -> Buffer k -> Int -> Char
@@ -87,7 +86,7 @@ instance Chunk ByteString where
   showElement = showByte
   showChunk = showByteString
 
-instance CharChunk ByteString where
+instance Chars ByteString where
   byteAt = ptrByteAt
   {-# INLINE byteAt #-}
 
@@ -132,7 +131,7 @@ instance Chunk Text where
   showElement = show
   showChunk = show
 
-instance CharChunk Text where
+instance Chars Text where
   byteAt = arrayByteAt
   {-# INLINE byteAt #-}
 

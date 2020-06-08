@@ -10,7 +10,7 @@ import Text.PariPari
 import qualified Data.ByteString as B
 
 type StringType    = B.ByteString
-type ParserMonad p = CharParser StringType p
+type ParserMonad p = CharsParser StringType p
 type Parser a      = (forall p. ParserMonad p => p a)
 
 -- {-# SPECIALISE_ALL ParserMonad p = p ~ Acceptor StringType #-}
@@ -69,7 +69,7 @@ main = do
   case args of
     [file] -> do
       src <- B.readFile file
-      let (result, reports) = runCharParser json file src
+      let (result, reports) = runCharsParser json file src
       for_ reports $ putStrLn . showReport
       case result of
         Just val -> print val

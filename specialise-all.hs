@@ -4,7 +4,6 @@
 {-# LANGUAGE Rank2Types #-}
 
 import Data.Foldable (for_)
-import Data.Semigroup ((<>))
 import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.Char as C
@@ -13,7 +12,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
 type StringType    = T.Text
-type ParserMonad p = CharParser StringType p
+type ParserMonad p = CharsParser StringType p
 type Parser a      = (forall p. ParserMonad p => p a)
 
 data Type
@@ -192,7 +191,7 @@ main = do
   case args of
     [src, _, dst] -> do
       code <- T.readFile src
-      let (result, reports) = runCharParser source src code
+      let (result, reports) = runCharsParser source src code
       for_ reports $ putStrLn . showReport
       case result of
         Nothing -> pure ()

@@ -39,22 +39,21 @@ module Text.PariPari.Internal.CharCombinators (
   , string
 ) where
 
-import Control.Applicative ((<|>), optional)
+import Control.Applicative (optional)
 import Control.Monad.Combinators (option, skipCount, skipMany)
 import Data.Functor (void)
 import Data.Maybe (fromMaybe)
-import Data.Semigroup ((<>))
 import Data.Word (Word8)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.ElementCombinators ((<?>))
 import qualified Data.Char as C
 
-type CharP k a  = (forall p. CharParser k p => p a)
+type CharP k a  = (forall p. CharsParser k p => p a)
 
 -- | Parse a digit byte for the given base.
 -- Bases 2 to 36 are supported.
-digitByte :: CharParser k p => Int -> p Word8
+digitByte :: CharsParser k p => Int -> p Word8
 digitByte base = asciiSatisfy (isDigit base)
 {-# INLINE digitByte #-}
 
@@ -76,7 +75,7 @@ digitToInt base b
 
 -- | Parse a single digit of the given base and return its value.
 -- Bases 2 to 36 are supported.
-digit :: CharParser k p => Int -> p Word
+digit :: CharsParser k p => Int -> p Word
 digit base = digitToInt base <$> asciiSatisfy (isDigit base)
 {-# INLINE digit #-}
 
@@ -85,7 +84,7 @@ digit base = digitToInt base <$> asciiSatisfy (isDigit base)
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Signs are not parsed by this combinator.
-integer' :: (Num a, CharParser k p) => p sep -> Int -> p (a, Int)
+integer' :: (Num a, CharsParser k p) => p sep -> Int -> p (a, Int)
 integer' sep base = label (integerLabel base) $ do
   d <- digit base
   accum 1 $ fromIntegral d
@@ -100,7 +99,7 @@ integer' sep base = label (integerLabel base) $ do
 -- Bases 2 to 36 are supported.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Signs are not parsed by this combinator.
-integer :: (Num a, CharParser k p) => p sep -> Int -> p a
+integer :: (Num a, CharsParser k p) => p sep -> Int -> p a
 integer sep base = label (integerLabel base) $ do
   d <- digit base
   accum $ fromIntegral d
@@ -137,16 +136,16 @@ hexadecimal = integer (pure ()) 16
 {-# INLINE hexadecimal #-}
 
 -- | Parse plus or minus sign
-sign :: (CharParser k f, Num a) => f (a -> a)
+sign :: (CharsParser k f, Num a) => f (a -> a)
 sign = (negate <$ asciiByte asc_minus) <|> (id <$ optional (asciiByte asc_plus))
 {-# INLINE sign #-}
 
 -- | Parse a number with a plus or minus sign.
-signed :: (Num a, CharParser k p) => p a -> p a
+signed :: (Num a, CharsParser k p) => p a -> p a
 signed p = ($) <$> sign <*> p
 {-# INLINE signed #-}
 
-fractionExp :: (Num a, CharParser k p) => p expSep -> p digitSep -> p (Maybe a)
+fractionExp :: (Num a, CharsParser k p) => p expSep -> p digitSep -> p (Maybe a)
 fractionExp expSep digitSep = do
   e <- optional expSep
   case e of
@@ -158,7 +157,7 @@ fractionExp expSep digitSep = do
 -- 'fractionDec' and 'fractionHex' should be used instead probably.
 -- Returns either an integer in 'Left' or a fraction in 'Right'.
 -- Signs are not parsed by this combinator.
-fraction :: (Num a, CharParser k p) => p expSep -> Int -> Int -> p digitSep -> p (Either a (a, Int, a))
+fraction :: (Num a, CharsParser k p) => p expSep -> Int -> Int -> p digitSep -> p (Either a (a, Int, a))
 fraction expSep expBase mantBasePow digitSep = do
   let mantBase = expBase ^ mantBasePow
   mant <- integer digitSep mantBase
@@ -177,7 +176,7 @@ fraction expSep expBase mantBasePow digitSep = do
 -- corresponding to mantissa * 10^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Signs are not parsed by this combinator.
-fractionDec :: (Num a, CharParser k p) => p digitSep -> p (Either a (a, Int, a))
+fractionDec :: (Num a, CharsParser k p) => p digitSep -> p (Either a (a, Int, a))
 fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 sep <?> "fraction"
 {-# INLINE fractionDec #-}
 
@@ -185,12 +184,12 @@ fractionDec sep = fraction (asciiSatisfy (\b -> b == asc_E || b == asc_e)) 10 1 
 -- corresponding to mantissa * 2^exponent.
 -- Digits can be separated by separator, e.g. `optional (char '_')`.
 -- Signs are not parsed by this combinator.
-fractionHex :: (Num a, CharParser k p) => p digitSep -> p (Either a (a, Int, a))
+fractionHex :: (Num a, CharsParser k p) => p digitSep -> p (Either a (a, Int, a))
 fractionHex sep = fraction (asciiSatisfy (\b -> b == asc_P || b == asc_p)) 2 4 sep <?> "hexadecimal fraction"
 {-# INLINE fractionHex #-}
 
 -- | Parse a case-insensitive character
-char' :: CharParser k p => Char -> p Char
+char' :: CharsParser k p => Char -> p Char
 char' x =
   let l = C.toLower x
       u = C.toUpper x
@@ -198,7 +197,7 @@ char' x =
 {-# INLINE char' #-}
 
 -- | Parse a character different from the given one.
-notChar :: CharParser k p => Char -> p Char
+notChar :: CharsParser k p => Char -> p Char
 notChar c = satisfy (/= c)
 {-# INLINE notChar #-}
 
@@ -249,7 +248,7 @@ punctuationChar = satisfy C.isPunctuation <?> "punctuation"
 
 -- | Parse a digit character of the given base.
 -- Bases 2 to 36 are supported.
-digitChar :: CharParser k p => Int -> p Char
+digitChar :: CharsParser k p => Int -> p Char
 digitChar base = unsafeAsciiToChar <$> digitByte base
 {-# INLINE digitChar #-}
 
@@ -259,7 +258,7 @@ asciiChar = unsafeAsciiToChar <$> anyAsciiByte
 {-# INLINE asciiChar #-}
 
 -- | Parse a character belonging to the given Unicode category
-categoryChar :: CharParser k p => C.GeneralCategory -> p Char
+categoryChar :: CharsParser k p => C.GeneralCategory -> p Char
 categoryChar cat = satisfy ((== cat) . C.generalCategory) <?> untitle (show cat)
 {-# INLINE categoryChar #-}
 
@@ -271,50 +270,50 @@ untitle (x:xs) = C.toLower x : go xs
                   | otherwise   = y : ys
 
 -- | Skip the next n characters
-skipChars :: CharParser k p => Int -> p ()
+skipChars :: CharsParser k p => Int -> p ()
 skipChars n = skipCount n anyChar
 {-# INLINE skipChars #-}
 
 -- | Skip char while predicate is true
-skipCharsWhile :: CharParser k p => (Char -> Bool) -> p ()
+skipCharsWhile :: CharsParser k p => (Char -> Bool) -> p ()
 skipCharsWhile f = skipMany (satisfy f)
 {-# INLINE skipCharsWhile #-}
 
 -- | Skip at least one char while predicate is true
-skipCharsWhile1 :: CharParser k p => (Char -> Bool) -> p ()
+skipCharsWhile1 :: CharsParser k p => (Char -> Bool) -> p ()
 skipCharsWhile1 f = satisfy f *> skipCharsWhile f
 {-# INLINE skipCharsWhile1 #-}
 
 -- | Take the next n characters and advance the position by n characters
-takeChars :: CharParser k p => Int -> p k
+takeChars :: CharsParser k p => Int -> p k
 takeChars n = asChunk (skipChars n) <?> "string of length " <> show n
 {-# INLINE takeChars #-}
 
 -- | Take chars while predicate is true
-takeCharsWhile :: CharParser k p => (Char -> Bool) -> p k
+takeCharsWhile :: CharsParser k p => (Char -> Bool) -> p k
 takeCharsWhile f = asChunk (skipCharsWhile f)
 {-# INLINE takeCharsWhile #-}
 
 -- | Take at least one byte while predicate is true
-takeCharsWhile1 :: CharParser k p => (Char -> Bool) -> p k
+takeCharsWhile1 :: CharsParser k p => (Char -> Bool) -> p k
 takeCharsWhile1 f = asChunk (skipCharsWhile1 f)
 {-# INLINE takeCharsWhile1 #-}
 
 -- | Parse a single character with the given predicate
-satisfy :: CharParser k p => (Char -> Bool) -> p Char
+satisfy :: CharsParser k p => (Char -> Bool) -> p Char
 satisfy f = scan $ \c -> if f c then Just c else Nothing
 {-# INLINE satisfy #-}
 
 -- | Parse a single character within the ASCII charset with the given predicate
-asciiSatisfy :: CharParser k p => (Word8 -> Bool) -> p Word8
+asciiSatisfy :: CharsParser k p => (Word8 -> Bool) -> p Word8
 asciiSatisfy f = asciiScan $ \b -> if f b then Just b else Nothing
 {-# INLINE asciiSatisfy #-}
 
-scanChars :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanChars :: CharsParser k p => (s -> Char -> Maybe s) -> s -> p s
 scanChars f = go
   where go s = (scan (f s) >>= go) <|> pure s
 {-# INLINE scanChars #-}
 
-scanChars1 :: CharParser k p => (s -> Char -> Maybe s) -> s -> p s
+scanChars1 :: CharsParser k p => (s -> Char -> Maybe s) -> s -> p s
 scanChars1 f s = scan (f s) >>= scanChars f
 {-# INLINE scanChars1 #-}

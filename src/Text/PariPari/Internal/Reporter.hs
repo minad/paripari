@@ -242,7 +242,7 @@ instance Chunk k => ChunkParser k (Reporter k) where
     pure $ packChunk src begin (end - begin)
   {-# INLINE asChunk #-}
 
-instance CharChunk k => CharParser k (Reporter k) where
+instance Chars k => CharsParser k (Reporter k) where
   scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0' ->
@@ -307,7 +307,7 @@ instance CharChunk k => CharParser k (Reporter k) where
           raiseError env st err $ EExpected [showByte b]
   {-# INLINE asciiByte #-}
 
-instance CharChunk k => IsString (Reporter k k) where
+instance Chars k => IsString (Reporter k k) where
   fromString = string
   {-# INLINE fromString #-}
 

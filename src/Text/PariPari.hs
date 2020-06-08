@@ -1,15 +1,15 @@
 module Text.PariPari (
   C.ChunkParser(..)
-  , C.CharParser(..)
+  , C.CharsParser(..)
   , C.Error(..)
   , C.showError
 
   , K.Chunk(Element, showElement, showChunk)
-  , K.CharChunk
+  , K.Chars
   , K.Pos(..)
 
-  , U.runCharParser
-  , U.runCharParserWithOptions
+  , U.runCharsParser
+  , U.runCharsParserWithOptions
   , U.runChunkParser
   , U.runChunkParserWithOptions
 

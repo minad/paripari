@@ -21,9 +21,9 @@ import qualified Control.Monad.Fail as Fail
 newtype Tracer k a = Tracer { unTracer :: Reporter k a }
   deriving (Sem.Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
 
-deriving instance CharChunk k => ChunkParser k (Tracer k)
-deriving instance CharChunk k => CharParser k (Tracer k)
-deriving instance CharChunk k => IsString (Tracer k k)
+deriving instance Chars k => ChunkParser k (Tracer k)
+deriving instance Chars k => CharsParser k (Tracer k)
+deriving instance Chars k => IsString (Tracer k k)
 
 instance Chunk k => Alternative (Tracer k) where
   empty = Tracer empty

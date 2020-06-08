@@ -186,7 +186,7 @@ instance Chunk k => ChunkParser k (Acceptor k) where
     pure $ packChunk src begin (end - begin)
   {-# INLINE asChunk #-}
 
-instance CharChunk k => CharParser k (Acceptor k) where
+instance Chars k => CharsParser k (Acceptor k) where
   scan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
     if | (c, w) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
@@ -241,7 +241,7 @@ instance CharChunk k => CharParser k (Acceptor k) where
           Nothing
   {-# INLINE asciiByte #-}
 
-instance CharChunk k => IsString (Acceptor k k) where
+instance Chars k => IsString (Acceptor k k) where
   fromString = string
   {-# INLINE fromString #-}
 
