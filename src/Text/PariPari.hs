@@ -9,13 +9,9 @@ module Text.PariPari (
   , K.Pos(..)
 
   , U.runCharParser
-  , U.runSeqCharParser
   , U.runCharParserWithOptions
-  , U.runSeqCharParserWithOptions
   , U.runChunkParser
-  , U.runSeqChunkParser
   , U.runChunkParserWithOptions
-  , U.runSeqChunkParserWithOptions
 
   , A.Acceptor
   , A.runAcceptor

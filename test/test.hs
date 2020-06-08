@@ -19,6 +19,9 @@ import Text.PariPari.Internal.Chunk (stringToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
 
+runAcceptor' :: Chunk k => Acceptor k a -> FilePath -> k -> Either Error a
+runAcceptor' a f k = maybe (Left $ EFail "Nothing") Right $ runAcceptor a f k
+
 main :: IO ()
 main = defaultMain tests
 
@@ -56,14 +59,14 @@ randomAsciiString = do
 tests :: TestTree
 tests = testGroup "Tests"
   [ testGroup "Chunk"
-    [ testGroup "Acceptor" $ chunkTests runAcceptor
+    [ testGroup "Acceptor" $ chunkTests runAcceptor'
     , testGroup "Reporter" $ chunkTests runReporterEither
     ]
 
   , testGroup "Char"
     [ testGroup "Acceptor"
-      [ testGroup "Text"       $ charTests @Text       runAcceptor
-      , testGroup "ByteString" $ charTests @ByteString runAcceptor
+      [ testGroup "Text"       $ charTests @Text       runAcceptor'
+      , testGroup "ByteString" $ charTests @ByteString runAcceptor'
       ]
 
     , testGroup "Reporter"
@@ -452,7 +455,7 @@ chunkTests run =
         err (lookAhead (element 'a')) ""
 
     , testCase "failWith" $
-        err (failWith (ECombinator "empty") :: p ()) "abc"
+        err (failWith (EFail "empty") :: p ()) "abc"
 
     , testCase "eof" $ do
         ok eof "" ()
@@ -613,7 +616,7 @@ chunkTests run =
 
   , testGroup "MonadFail"
     [ testCase "fail" $ do
-        err (failWith (ECombinator "empty") :: p ()) "abc"
+        err (failWith (EFail "empty") :: p ()) "abc"
     ]
 
   , testGroup "Alternative"

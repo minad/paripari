@@ -29,7 +29,6 @@ data Error
   | EExpected         [String]
   | EUnexpected       String
   | EFail             String
-  | ECombinator       String
   | EIndentNotAligned !Int !Int
   | EIndentOverLine   !Int !Int
   | ENotEnoughIndent  !Int !Int
@@ -158,7 +157,6 @@ showError EInvalidUtf8             = "Invalid UTF-8 character found"
 showError (EExpected tokens)       = "Expected " <> intercalate ", " tokens
 showError (EUnexpected token)      = "Unexpected " <> token
 showError (EFail msg)              = msg
-showError (ECombinator name)       = "Combinator " <> name <> " failed"
 showError (EIndentNotAligned rc c) = "Invalid alignment, expected column " <> show rc <> " expected, got " <> show c
 showError (EIndentOverLine   rl l) = "Indentation over line, expected line " <> show rl <> ", got " <> show l
 showError (ENotEnoughIndent  rc c) = "Must be indented deeper than column " <> show rc <> ", got column " <> show c
