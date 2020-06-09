@@ -71,7 +71,5 @@ main = do
       src <- B.readFile file
       let (result, reports) = runCharParser json file src
       for_ reports $ putStrLn . showReport
-      case result of
-        Just val -> print val
-        Nothing  -> print $ runTracer json file src
+      print result
     _ -> error "Usage: paripari-example test.json"

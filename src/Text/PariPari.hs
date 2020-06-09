@@ -26,9 +26,6 @@ module Text.PariPari (
   , R.runReporterWithOptions
   , R.defaultReportOptions
 
-  , T.Tracer
-  , T.runTracer
-
   , module Text.PariPari.Internal.ElementCombinators
   , module Text.PariPari.Internal.CharCombinators
 ) where
@@ -40,4 +37,3 @@ import qualified Text.PariPari.Internal.Chunk as K
 import qualified Text.PariPari.Internal.Class as C
 import qualified Text.PariPari.Internal.Reporter as R
 import qualified Text.PariPari.Internal.Run as U
-import qualified Text.PariPari.Internal.Tracer as T

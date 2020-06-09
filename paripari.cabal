@@ -36,7 +36,6 @@ library
       Text.PariPari.Internal.ElementCombinators
       Text.PariPari.Internal.Reporter
       Text.PariPari.Internal.Run
-      Text.PariPari.Internal.Tracer
       Text.PariPari.Lens
   other-modules:
       Paths_paripari

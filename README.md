@@ -171,8 +171,7 @@ space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 
 The main function of the example program reads a file, runs the parser
 and prints the value if the parsing succeeded.
-In the case of an error a report is printed. For demonstration purposes
-we also run the tracing parsing with `runTracer`.
+In the case of an error a report is printed.
 
 ``` haskell
 main :: IO ()
@@ -183,9 +182,7 @@ main = do
       src <- B.readFile file
       let (result, reports) = runCharParser json file src
       for_ reports $ putStrLn . showReport
-      case result of
-        Just val -> print val
-        Nothing  -> print $ runTracer json file src
+      print result
     _ -> error "Usage: paripari-example test.json"
 ```
 
