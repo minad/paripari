@@ -11,7 +11,7 @@ PariPari offers two parsing strategies. There is a fast Acceptor and a slower Re
 If the Acceptor fails, the Reporter returns a report about the parsing errors.
 This allows for fast parsing in the good case without compromising on the quality of the error messages.
 
-Like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
+Like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `<!>` parser combinator is provided, which does not backtrack.
 
 PariPari operates on strict `ByteString` and `Text`.
 As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
@@ -24,8 +24,7 @@ The interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
   and fallback to slower error reporting parser (Reporter)
   to optimize the common case
 * Backtracking by default for ease of use
-* `commit` combinator to improve error messages by committing to branches
-* Tracing parser to analyze backtracking
+* `<!>` can be used to avoid backtracking
 * Support for strict UTF-8 `ByteString` and strict `Text`
 * Combinators for indentation-sensitive parsing
 * Error recovery support via `recover`

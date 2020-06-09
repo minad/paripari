@@ -126,9 +126,13 @@ parserTests run =
         ok (hidden $ char 'a') "abc" 'a'
         err (hidden $ char 'b') "abc"
 
-    , testCase "commit" $ do
-        ok (commit $ char 'a') "abc" 'a'
-        err (commit $ char 'b') "abc"
+    , testCase "try" $ do
+        ok (try $ char 'a') "abc" 'a'
+        err (try $ char 'b') "abc"
+
+    , testCase "(<!>)" $ do
+        ok (char 'b' <!> char 'a' <!> char 'c') "abc" 'a'
+        ok (chunk "abd" <!> chunk "abc" <!> chunk "abe") "abcdef" "abc"
 
     , testCase "recover" $ do
         ok (recover (char 'a' <* eof) (char 'b')) "a" 'a'

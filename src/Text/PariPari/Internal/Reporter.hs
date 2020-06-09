@@ -174,8 +174,17 @@ instance Chunk k => Parser k (Reporter k) where
   hidden p = local (const $ \env -> env { _envHidden = True }) p
   {-# INLINE hidden #-}
 
-  commit p = local (const $ \env -> env { _envCommit = _envCommit env + 1 }) p
-  {-# INLINE commit #-}
+  try p = Reporter $ \env st ok err ->
+    let err' _ = err st
+    in unReporter p env st ok err'
+  {-# INLINE try #-}
+
+  p1 <!> p2 = Reporter $ \env st ok err ->
+    let err' s
+          | 1# <- _stOff s ==# _stOff st = unReporter p2 env (mergeErrorState env st s) ok err
+          | otherwise = err s
+    in unReporter p1 env st ok err'
+  {-# INLINE (<!>) #-}
 
   notFollowedBy p = Reporter $ \env st ok err ->
     let ok' x _ = raiseError env st err $ EUnexpected $ show x

@@ -37,6 +37,8 @@ data Pos = Pos
   , _posColumn :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
+infixl 3 <!>
+
 -- | Parser class, which specifies the necessary
 -- primitives for parsing. All other parser combinators
 -- rely on these primitives.
@@ -82,23 +84,11 @@ class (MonadFail p, MonadPlus p, Chunk k, IsString (p k)) => Parser k p | p -> k
   -- down the fast path of your parser.
   hidden :: p a -> p a
 
-  -- | Commit to the given branch, increasing
-  -- the priority of the errors within this branch
-  -- in contrast to other branches.
-  --
-  -- This is basically the opposite of the `try`
-  -- combinator provided by other parser combinator
-  -- libraries, which decreases the error priority
-  -- within the given branch (and usually also influences backtracking).
-  --
-  -- `commit` only applies to the reported
-  -- errors, it has no effect on the backtracking behavior
-  -- of the parser.
-  --
-  -- __Note__: This function has zero cost in the 'Acceptor'. You can
-  -- use it to improve the error reports without slowing
-  -- down the fast path of your parser.
-  commit :: p a -> p a
+  -- | Reset position if parser fails
+  try :: p a -> p a
+
+  -- | Alternative which does not backtrack.
+  (<!>) :: p a -> p a -> p a
 
   -- | Parse with error recovery.
   -- If the parser p fails in `recover p r`
