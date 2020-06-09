@@ -36,7 +36,7 @@ source :: P [SourceLine]
 source = sepBy sourceLine (char '\n') <* eof
 
 sourceLine :: P SourceLine
-sourceLine = specialiseAll <|> typeDecl <|> otherLine
+sourceLine = specialiseAll <!> typeDecl <!> otherLine
 
 otherLine :: P SourceLine
 otherLine = OtherLine <$> takeCharsWhile (/= '\n')
@@ -70,9 +70,9 @@ typeTuple = do
 typeAtom :: P Type
 typeAtom =
   TypeName <$> typeName
-  <|> TypeVar <$> name
-  <|> TypeList <$> between (symbol "[") (symbol "]") type_
-  <|> typeTuple
+  <!> TypeVar <$> name
+  <!> TypeList <$> between (symbol "[") (symbol "]") type_
+  <!> typeTuple
 
 typeApp :: P Type
 typeApp = do
@@ -83,9 +83,9 @@ type_ :: P Type
 type_ = do
   t <- typeApp
   TypeEq t <$> (symbol "~" *> type_)
-    <|> TypeLam t <$> (symbol "->" *> type_)
-    <|> TypeConstr t <$> (symbol "=>" *> type_)
-    <|> pure t
+    <!> TypeLam t <$> (symbol "->" *> type_)
+    <!> TypeConstr t <$> (symbol "=>" *> type_)
+    <!> pure t
 
 typeDecl :: P SourceLine
 typeDecl = TypeDecl <$> sepBy1 name (symbol ",") <*> (symbol "::" *> type_)

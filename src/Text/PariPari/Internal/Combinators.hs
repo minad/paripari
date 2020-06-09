@@ -176,7 +176,7 @@ indented = do
 -- | Parser succeeds either on the reference line or
 -- for columns greater than the current reference column
 linefold :: P k ()
-linefold = line <|> indented
+linefold = line <!> indented
 {-# INLINE linefold #-}
 
 -- | Parse a digit byte for the given base.
@@ -216,7 +216,7 @@ integer' :: (Num a, Parser k p) => p sep -> Int -> p (a, Int)
 integer' sep base = label (integerLabel base) $ do
   d <- digit base
   accum 1 $ fromIntegral d
-  where accum !i !n = next i n <|> pure (n, i)
+  where accum !i !n = next i n <!> pure (n, i)
         next !i !n = do
           void $ sep
           d <- digit base
@@ -231,7 +231,7 @@ integer :: (Num a, Parser k p) => p sep -> Int -> p a
 integer sep base = label (integerLabel base) $ do
   d <- digit base
   accum $ fromIntegral d
-  where accum !n = next n <|> pure n
+  where accum !n = next n <!> pure n
         next !n = do
           void $ sep
           d <- digit base
@@ -265,7 +265,7 @@ hexadecimal = integer (pure ()) 16
 
 -- | Parse plus or minus sign
 sign :: (Parser k f, Num a) => f (a -> a)
-sign = (negate <$ asciiByte asc_minus) <|> (id <$ optional (asciiByte asc_plus))
+sign = (negate <$ asciiByte asc_minus) <!> (id <$ optional (asciiByte asc_plus))
 {-# INLINE sign #-}
 
 -- | Parse a number with a plus or minus sign.
@@ -439,7 +439,7 @@ asciiSatisfy f = asciiScan $ \b -> if f b then Just b else Nothing
 
 scanChars :: Parser k p => (s -> Char -> Maybe s) -> s -> p s
 scanChars f = go
-  where go s = (scan (f s) >>= go) <|> pure s
+  where go s = (scan (f s) >>= go) <!> pure s
 {-# INLINE scanChars #-}
 
 scanChars1 :: Parser k p => (s -> Char -> Maybe s) -> s -> p s
