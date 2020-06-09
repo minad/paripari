@@ -1,5 +1,0 @@
-- get rid of chunk type?
-- use unboxed types for chunk
-- use unboxed types for acceptor
-- unbox ref position!
-- no automatic backtracking!
