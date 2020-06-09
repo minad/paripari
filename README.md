@@ -7,17 +7,16 @@ PariPari is a parser combinator library for Haskell. PariPari can be used as
 a drop in replacement for the Parsec class of libraries. However be aware that the library
 is new and unstable.
 
-PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter which are evaluated in parallel. If the Acceptor fails, the Reporter returns a report about the parsing errors.
-This allows for fast parsing in the good case without compromising on the quality of the error messages. I have seen
-this idea coming up times before, suggesting to use two different libraries (Trifecta after Attoparsec etc...).
-This library provides both parsers out of the box with equivalent behaviour, in particular with respect to backtracking.
+PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter.
+If the Acceptor fails, the Reporter returns a report about the parsing errors.
+This allows for fast parsing in the good case without compromising on the quality of the error messages.
 
 Like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `commit :: ChunkParser k p => p a -> p a` parser combinator is provided, which raises the priority of the errors within the given branch. Performance issues can be analyzed by debugging with the tracing parser, which prints messages when backtracking occurs.
 
 PariPari operates on strict `ByteString` and `Text`.
 As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
 If characters are parsed using the `char` and `satisfy` combinators, bytestrings are interpreted as UTF-8 and decoded on the fly.
-In general, the interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
+The interface of PariPari matches mostly the one of Attoparsec/Megaparsec/etc.
 
 ## Features
 
@@ -41,7 +40,7 @@ In this example we use PariPari to parse JSON. The following is literate haskell
 ### Prologue
 
 We specify a preprocessor, language pragmas and the library imports.
-Performance of PariPari depends crucially on the specialisation of `CharParser k a` to
+Performance of PariPari depends crucially on the specialisation of `Parser k a` to
 `Acceptor ByteString a` and `Reporter ByteString a`. In larger parsers it seems that the
 GHC specialiser does not kick in. As a workaround we use `paripari-specialise-all` as a
 preprocessor, which generates `SPECIALISE` pragmas from our custom `SPECIALISE_ALL` pragma.
@@ -64,7 +63,7 @@ import qualified Data.ByteString as B
 
 We parametrize the parser with the string type.
 Both `ByteString` and `Text` are supported.
-Note that even in the case of `ByteStrings` a `CharParser` instance
+Note that even in the case of `ByteStrings` a `Parser` instance
 is provided, which interprets the bytes as UTF-8.
 
 ``` haskell
