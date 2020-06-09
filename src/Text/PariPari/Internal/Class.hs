@@ -1,8 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FunctionalDependencies #-}
 module Text.PariPari.Internal.Class (
-  ChunkParser(..)
-  , CharParser(..)
+  Parser(..)
   , Alternative(..)
   , MonadPlus
   , Pos(..)
@@ -35,7 +34,7 @@ data Error
 -- | Parser class, which specifies the necessary
 -- primitives for parsing. All other parser combinators
 -- rely on these primitives.
-class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
+class (MonadFail p, MonadPlus p, Chunk k, IsString (p k)) => Parser k p | p -> k where
   -- | Get file name associated with current parser
   getFile :: p FilePath
 
@@ -109,12 +108,6 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- down the fast path of your parser.
   recover :: p a -> p a -> p a
 
-  -- | Parse a single element
-  element :: Element k -> p (Element k)
-
-  -- | Scan a single element
-  elementScan :: (Element k -> Maybe a) -> p a
-
   -- | Parse a chunk of elements. The chunk must not
   -- contain multiple lines, otherwise the position information
   -- will be invalid.
@@ -124,7 +117,6 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- result as buffer
   asChunk :: p () -> p k
 
-class (ChunkParser k p, IsString (p k), Chars k) => CharParser k p | p -> k where
   -- | Parse a single character
   --
   -- __Note__: The character '\0' cannot be parsed using this combinator
@@ -166,6 +158,6 @@ unexpectedEnd :: Error
 unexpectedEnd = EUnexpected "end of file"
 
 -- | Parse a string
-string :: CharParser k p => String -> p k
+string :: Parser k p => String -> p k
 string t = chunk (stringToChunk t)
 {-# INLINE string #-}

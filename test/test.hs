@@ -17,6 +17,7 @@ import Text.PariPari
 import Text.PariPari.Internal.Chunk (stringToChunk, asc_a, asc_0, asc_9)
 import qualified Data.Char as C
 import qualified Data.List.NonEmpty as NE
+import Data.String (IsString(..))
 
 runAcceptor' :: Chunk k => Acceptor k a -> FilePath -> k -> Either Error a
 runAcceptor' a f k = maybe (Left $ EFail "Nothing") Right $ runAcceptor a f k
@@ -57,31 +58,96 @@ randomAsciiString = do
 
 tests :: TestTree
 tests = testGroup "Tests"
-  [ testGroup "Chunk"
-    [ testGroup "Acceptor" $ chunkTests runAcceptor'
-    , testGroup "Reporter" $ chunkTests runReporterEither
+  [ testGroup "Acceptor"
+    [ testGroup "Text"       $ parserTests @Text       runAcceptor'
+    , testGroup "ByteString" $ parserTests @ByteString runAcceptor'
     ]
 
-  , testGroup "Char"
-    [ testGroup "Acceptor"
-      [ testGroup "Text"       $ charTests @Text       runAcceptor'
-      , testGroup "ByteString" $ charTests @ByteString runAcceptor'
-      ]
-
-    , testGroup "Reporter"
-      [ testGroup "Text"       $ charTests @Text       runReporterEither
-      , testGroup "ByteString" $ charTests @ByteString runReporterEither
-      ]
+  , testGroup "Reporter"
+    [ testGroup "Text"       $ parserTests @Text       runReporterEither
+    , testGroup "ByteString" $ parserTests @ByteString runReporterEither
     ]
 
   , testGroup "Reporter specific" reporterTests
   ]
 
-charTests :: forall k p e. (CharParser k p, Chars k, Eq e, Show e, Show k)
+parserTests :: forall k p e. (Parser k p, Chunk k, IsString k, Eq e, Show e, Show k)
           => (forall a. p a -> FilePath -> k -> Either e a) -> [TestTree]
-charTests run =
-  [ testGroup "CharParser" $
-    [ testCase "char" $ do
+parserTests run =
+  [ testGroup "ChunkParser"
+    [ testCase "getFile" $ do
+        ok getFile "" "filename"
+
+    , testCase "getPos" $ do
+        ok getPos "" (Pos 1 1)
+        ok (char 'a' *> getPos) "abc" (Pos 1 2)
+        ok (char 'a' *> char '\n' *> getPos) "a\nb" (Pos 2 1)
+        ok (chunk "a\n" *> getPos) "a\nb" (Pos 1 3) -- chunk must not contain newlines!
+        ok (char 'a' *> char '\n' *> char 'b' *> getPos) "a\nb" (Pos 2 2)
+
+    , testCase "getRefPos" $ do
+        ok getRefPos "" (Pos 1 1)
+        ok (char 'a' *> getRefPos) "abc" (Pos 1 1)
+        ok (char 'a' *> char '\n' *> withRefPos getRefPos) "a\nb" (Pos 2 1)
+        ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefPos) "a\nb" (Pos 2 2)
+        ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefPos)) "a\nb" (Pos 2 1)
+
+    , testCase "notFollowedBy" $ do
+        ok (char 'a' <* notFollowedBy (char 'c')) "abc" 'a'
+        err (char 'a' <* notFollowedBy (char 'b')) "abc"
+        ok (char 'a' *> notFollowedBy (chunk "bd") *> char 'b') "abc" 'b'
+        err (char 'a' *> notFollowedBy (chunk "bc")) "abc"
+        ok (char 'a' *> notFollowedBy (char 'c') *> getPos) "abc" (Pos 1 2)
+
+    , testCase "lookAhead" $ do
+        ok (lookAhead (char 'a')) "abc" 'a'
+        ok (lookAhead (char 'a') *> getPos) "abc" (Pos 1 1)
+        ok (lookAhead (chunk "ab") *> getPos) "abc" (Pos 1 1)
+        err (lookAhead (char 'b')) "abc"
+        err (lookAhead (chunk "bd")) "abc"
+        err (lookAhead (char 'a')) ""
+
+    , testCase "failWith" $
+        err (failWith (EFail "empty") :: p ()) "abc"
+
+    , testCase "eof" $ do
+        ok eof "" ()
+        ok (chunk "abc" *> eof) "abc" ()
+        err eof "abc"
+        err eof "\0"
+        err (chunk "ab" *> eof) "abc"
+
+    , testCase "label" $ do
+        ok (label "blub" $ char 'a') "abc" 'a'
+        err (label "blub" $ char 'b') "abc"
+        ok (char 'a' <?> "blub") "abc" 'a'
+
+    , testCase "hidden" $ do
+        ok (hidden $ char 'a') "abc" 'a'
+        err (hidden $ char 'b') "abc"
+
+    , testCase "commit" $ do
+        ok (commit $ char 'a') "abc" 'a'
+        err (commit $ char 'b') "abc"
+
+    , testCase "recover" $ do
+        ok (recover (char 'a' <* eof) (char 'b')) "a" 'a'
+        err (recover (char 'a') (char 'b')) "c"
+        err (recover (char 'a' <* eof) (char 'b')) "c"
+
+    , testCase "chunk" $ do
+        ok (chunk "ab") "abc" "ab"
+        err (chunk "bc") "abc"
+        err (chunk "ab") ""
+
+    , testCase "asChunk" $ do
+        ok (asChunk (void $ chunk "ab")) "abc" "ab"
+        ok (asChunk (void $ anyChar *> anyChar)) "abc" "ab"
+        ok (asChunk (skipCount 2 anyChar)) "abc" "ab"
+        err (asChunk (void $ chunk "bc")) "abc"
+        err (asChunk (void $ chunk "ab")) ""
+
+    , testCase "char" $ do
         ok (char 'a') "abc" 'a'
         ok (char 'a' <* eof) "a" 'a'
         err (char 'b') "abc"
@@ -121,6 +187,78 @@ charTests run =
     , testCase "asciiByte-random" $ replicateM_ randomTries $ do
         s <- randomAsciiString
         ok (traverse (asciiByte . fromIntegral . C.ord) s *> eof) s ()
+    ]
+
+  , testGroup "Alternative"
+    [ testCase "(<|>)" $ do
+        ok (char 'b' <|> char 'a' <|> char 'c') "abc" 'a'
+        ok (chunk "abd" <|> chunk "abc" <|> chunk "abe") "abcdef" "abc"
+
+    , testCase "empty" $ do
+        err (empty :: p ()) "abc"
+        err (empty :: p ()) ""
+    ]
+
+  , testGroup "MonadFail"
+    [ testCase "fail" $ do
+        err (failWith (EFail "empty") :: p ()) "abc"
+    ]
+
+  , testGroup "Basic Combinators"
+    [ testCase "optional" $ do
+        ok (optional (char 'a')) "abc" (Just 'a')
+        ok (optional (char 'b')) "abc" Nothing
+        ok (optional (char 'a')) "" Nothing
+
+    , testCase "some" $ do
+        ok (some (char 'a')) "abc" (NE.fromList "a")
+        ok (some (char 'a')) "aabc" (NE.fromList "aa")
+        err (some (char 'b')) "abc"
+        err (some (char 'a')) ""
+
+    , testCase "many" $ do
+        ok (many (char 'a')) "abc" "a"
+        ok (many (char 'a')) "aabc" "aa"
+        ok (many (char 'b')) "abc" ""
+        ok (many (char 'a')) "" ""
+    ]
+
+  , testGroup "Position Combinators"
+    [ testCase "getLine" $ do
+        ok getLine "" 1
+        ok (char 'a' *> getLine) "abc" 1
+        ok (char 'a' *> char '\n' *> getLine) "a\nb" 2
+        ok (char 'a' *> char '\n' *> char 'b' *> getLine) "a\nb" 2
+
+    , testCase "getRefLine" $ do
+        ok getRefLine "" 1
+        ok (char 'a' *> getRefLine) "abc" 1
+        ok (char 'a' *> char '\n' *> withRefPos getRefLine) "a\nb" 2
+        ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefLine) "a\nb" 2
+        ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefLine)) "a\nb" 2
+
+    , testCase "getColumn" $ do
+        ok getColumn "" 1
+        ok (char 'a' *> getColumn) "abc" 2
+        ok (char 'a' *> char '\n' *> getColumn) "a\nb" 1
+        ok (char 'a' *> char '\n' *> char 'b' *> getColumn) "a\nb" 2
+
+    , testCase "getRefColumn" $ do
+        ok getRefColumn "" 1
+        ok (char 'a' *> getRefColumn) "abc" 1
+        ok (char 'a' *> char '\n' *> withRefPos getRefColumn) "a\nb" 1
+        ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefColumn) "a\nb" 2
+        ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefColumn)) "a\nb" 1
+
+    , testCase "withPos" $ do
+        ok (withPos $ char 'a') "abc" (Pos 1 1, 'a')
+        ok (char 'a' *> withPos (char 'b')) "abc" (Pos 1 2, 'b')
+        ok (char 'a' *> char '\n' *> withPos (char 'b')) "a\nb" (Pos 2 1, 'b')
+
+    , testCase "withSpan" $ do
+        ok (withSpan $ chunk "ab") "abc" ((Pos 1 1, Pos 1 3), "ab")
+        ok (char 'a' *> withSpan (chunk "bcd")) "abcde" ((Pos 1 2, Pos 1 5), "bcd")
+        ok (char 'a' *> char '\n' *> withSpan (chunk "bcd")) "a\nbcde" ((Pos 2 1, Pos 2 4), "bcd")
     ]
 
   , testGroup "Char Combinators"
@@ -417,256 +555,20 @@ charTests run =
   okFraction :: HasCallStack => p (Either Integer (Integer, Int, Integer)) -> String -> Either Integer (Integer, Int, Integer) -> Assertion
   okFraction = ok
 
-chunkTests :: forall p e. (ChunkParser Text p, Eq e, Show e)
-          => (forall a. p a -> FilePath -> Text -> Either e a) -> [TestTree]
-chunkTests run =
-  [ testGroup "ChunkParser"
-    [ testCase "getFile" $ do
-        ok getFile "" "filename"
-
-    , testCase "getPos" $ do
-        ok getPos "" (Pos 1 1)
-        ok (element 'a' *> getPos) "abc" (Pos 1 2)
-        ok (element 'a' *> element '\n' *> getPos) "a\nb" (Pos 2 1)
-        ok (chunk "a\n" *> getPos) "a\nb" (Pos 1 3) -- chunk must not contain newlines!
-        ok (element 'a' *> element '\n' *> element 'b' *> getPos) "a\nb" (Pos 2 2)
-
-    , testCase "getRefPos" $ do
-        ok getRefPos "" (Pos 1 1)
-        ok (element 'a' *> getRefPos) "abc" (Pos 1 1)
-        ok (element 'a' *> element '\n' *> withRefPos getRefPos) "a\nb" (Pos 2 1)
-        ok (element 'a' *> element '\n' *> element 'b' *> withRefPos getRefPos) "a\nb" (Pos 2 2)
-        ok (element 'a' *> element '\n' *> withRefPos (element 'b' *> getRefPos)) "a\nb" (Pos 2 1)
-
-    , testCase "notFollowedBy" $ do
-        ok (element 'a' <* notFollowedBy (element 'c')) "abc" 'a'
-        err (element 'a' <* notFollowedBy (element 'b')) "abc"
-        ok (element 'a' *> notFollowedBy (chunk "bd") *> element 'b') "abc" 'b'
-        err (element 'a' *> notFollowedBy (chunk "bc")) "abc"
-        ok (element 'a' *> notFollowedBy (element 'c') *> getPos) "abc" (Pos 1 2)
-
-    , testCase "lookAhead" $ do
-        ok (lookAhead (element 'a')) "abc" 'a'
-        ok (lookAhead (element 'a') *> getPos) "abc" (Pos 1 1)
-        ok (lookAhead (chunk "ab") *> getPos) "abc" (Pos 1 1)
-        err (lookAhead (element 'b')) "abc"
-        err (lookAhead (chunk "bd")) "abc"
-        err (lookAhead (element 'a')) ""
-
-    , testCase "failWith" $
-        err (failWith (EFail "empty") :: p ()) "abc"
-
-    , testCase "eof" $ do
-        ok eof "" ()
-        ok (chunk "abc" *> eof) "abc" ()
-        err eof "abc"
-        err eof "\0"
-        err (chunk "ab" *> eof) "abc"
-
-    , testCase "label" $ do
-        ok (label "blub" $ element 'a') "abc" 'a'
-        err (label "blub" $ element 'b') "abc"
-        ok (element 'a' <?> "blub") "abc" 'a'
-
-    , testCase "hidden" $ do
-        ok (hidden $ element 'a') "abc" 'a'
-        err (hidden $ element 'b') "abc"
-
-    , testCase "commit" $ do
-        ok (commit $ element 'a') "abc" 'a'
-        err (commit $ element 'b') "abc"
-
-    , testCase "recover" $ do
-        ok (recover (element 'a' <* eof) (element 'b')) "a" 'a'
-        err (recover (element 'a') (element 'b')) "c"
-        err (recover (element 'a' <* eof) (element 'b')) "c"
-
-    , testCase "element" $ do
-        ok (element 'a') "abc" 'a'
-        ok (element 'a' <* eof) "a" 'a'
-        err (element 'b') "abc"
-        err (element 'a') ""
-
-        -- sentinel
-        ok (element '\0') "\0" '\0'
-        ok (element '\0' <* eof) "\0" '\0'
-        err (element '\0') ""
-
-    , testCase "elementScan" $ do
-        ok (elementScan (\c -> if c == 'a' then Just c else Nothing)) "abc" 'a'
-        ok (elementScan (\c -> if c == 'a' then Just c else Nothing) <* eof) "a" 'a'
-        err (elementScan (\c -> if c == 'b' then Just c else Nothing)) "abc"
-        err (elementScan Just) ""
-
-        -- sentinel
-        ok (elementScan (\c -> if c == '\0' then Just c else Nothing)) "\0" '\0'
-        ok (elementScan (\c -> if c == '\0' then Just c else Nothing) <* eof) "\0" '\0'
-
-    , testCase "chunk" $ do
-        ok (chunk "ab") "abc" "ab"
-        err (chunk "bc") "abc"
-        err (chunk "ab") ""
-
-    , testCase "asChunk" $ do
-        ok (asChunk (void $ chunk "ab")) "abc" "ab"
-        ok (asChunk (void $ anyElement *> anyElement)) "abc" "ab"
-        ok (asChunk (skipCount 2 anyElement)) "abc" "ab"
-        err (asChunk (void $ chunk "bc")) "abc"
-        err (asChunk (void $ chunk "ab")) ""
-    ]
-
-  , testGroup "Position Combinators"
-    [ testCase "getLine" $ do
-        ok getLine "" 1
-        ok (element 'a' *> getLine) "abc" 1
-        ok (element 'a' *> element '\n' *> getLine) "a\nb" 2
-        ok (element 'a' *> element '\n' *> element 'b' *> getLine) "a\nb" 2
-
-    , testCase "getRefLine" $ do
-        ok getRefLine "" 1
-        ok (element 'a' *> getRefLine) "abc" 1
-        ok (element 'a' *> element '\n' *> withRefPos getRefLine) "a\nb" 2
-        ok (element 'a' *> element '\n' *> element 'b' *> withRefPos getRefLine) "a\nb" 2
-        ok (element 'a' *> element '\n' *> withRefPos (element 'b' *> getRefLine)) "a\nb" 2
-
-    , testCase "getColumn" $ do
-        ok getColumn "" 1
-        ok (element 'a' *> getColumn) "abc" 2
-        ok (element 'a' *> element '\n' *> getColumn) "a\nb" 1
-        ok (element 'a' *> element '\n' *> element 'b' *> getColumn) "a\nb" 2
-
-    , testCase "getRefColumn" $ do
-        ok getRefColumn "" 1
-        ok (element 'a' *> getRefColumn) "abc" 1
-        ok (element 'a' *> element '\n' *> withRefPos getRefColumn) "a\nb" 1
-        ok (element 'a' *> element '\n' *> element 'b' *> withRefPos getRefColumn) "a\nb" 2
-        ok (element 'a' *> element '\n' *> withRefPos (element 'b' *> getRefColumn)) "a\nb" 1
-
-    , testCase "withPos" $ do
-        ok (withPos $ element 'a') "abc" (Pos 1 1, 'a')
-        ok (element 'a' *> withPos (element 'b')) "abc" (Pos 1 2, 'b')
-        ok (element 'a' *> element '\n' *> withPos (element 'b')) "a\nb" (Pos 2 1, 'b')
-
-    , testCase "withSpan" $ do
-        ok (withSpan $ chunk "ab") "abc" ((Pos 1 1, Pos 1 3), "ab")
-        ok (element 'a' *> withSpan (chunk "bcd")) "abcde" ((Pos 1 2, Pos 1 5), "bcd")
-        ok (element 'a' *> element '\n' *> withSpan (chunk "bcd")) "a\nbcde" ((Pos 2 1, Pos 2 4), "bcd")
-    ]
-
-  , testGroup "Element Combinators"
-    [ testCase "elementSatisfy" $ do
-        ok (elementSatisfy (== 'a')) "abc" 'a'
-        ok (elementSatisfy (== 'a') <* eof) "a" 'a'
-        err (elementSatisfy (== 'b')) "abc"
-        err (elementSatisfy (== 'a')) ""
-
-        -- sentinel
-        ok (elementSatisfy (== '\0')) "\0" '\0'
-        ok (elementSatisfy (== '\0') <* eof) "\0" '\0'
-        err (elementSatisfy (== '\0')) ""
-
-    , testCase "anyElement" $ do
-        ok anyElement "abc" 'a'
-        err anyElement ""
-
-    , testCase "notElement" $ do
-        ok (notElement 'b') "abc" 'a'
-        err (notElement 'a') "a"
-        err (notElement 'a') ""
-
-    , testCase "takeElementsWhile" $ do
-        ok (takeElementsWhile (== 'a')) "" ""
-        ok (takeElementsWhile (== 'a')) "b" ""
-        ok (takeElementsWhile (== 'a') <* eof) "aaa" "aaa"
-        ok (takeElementsWhile (== 'a') <* element 'b') "aaab" "aaa"
-
-    , testCase "skipElements" $ do
-        ok (skipElements 0) "" ()
-        ok (skipElements 3 <* eof) "abc" ()
-        ok (skipElements 3 <* element 'b') "aaab" ()
-        err (skipElements 1) ""
-        err (skipElements 2) "a"
-
-    , testCase "takeElements" $ do
-        ok (takeElements 0) "" ""
-        ok (takeElements 3 <* eof) "abc" "abc"
-        ok (takeElements 3 <* element 'b') "aaab" "aaa"
-        err (takeElements 1) ""
-        err (takeElements 2) "a"
-
-    , testCase "skipElementsWhile" $ do
-        ok (skipElementsWhile (== 'a')) "" ()
-        ok (skipElementsWhile (== 'a')) "b" ()
-        ok (skipElementsWhile (== 'a') *> eof) "aaa" ()
-        ok (skipElementsWhile (== 'a') *> element 'b') "aaab" 'b'
-
-    , testCase "skipElementsWhile1" $ do
-        err (skipElementsWhile1 (== 'a')) ""
-        err (skipElementsWhile1 (== 'a')) "b"
-        ok (skipElementsWhile1 (== 'a') *> eof) "aaa" ()
-        ok (skipElementsWhile1 (== 'a') *> element 'b') "aaab" 'b'
-
-    , testCase "takeElementsWhile1" $ do
-        err (takeElementsWhile1 (== 'a')) ""
-        err (takeElementsWhile1 (== 'a')) "b"
-        ok (takeElementsWhile1 (== 'a') <* eof) "aaa" "aaa"
-        ok (takeElementsWhile1 (== 'a') <* element 'b') "aaab" "aaa"
-    ]
-
-  , testGroup "MonadFail"
-    [ testCase "fail" $ do
-        err (failWith (EFail "empty") :: p ()) "abc"
-    ]
-
-  , testGroup "Alternative"
-    [ testCase "(<|>)" $ do
-        ok (element 'b' <|> element 'a' <|> element 'c') "abc" 'a'
-        ok (chunk "abd" <|> chunk "abc" <|> chunk "abe") "abcdef" "abc"
-
-    , testCase "empty" $ do
-        err (empty :: p ()) "abc"
-        err (empty :: p ()) ""
-    ]
-
-  , testGroup "Basic Combinators"
-    [ testCase "optional" $ do
-        ok (optional (element 'a')) "abc" (Just 'a')
-        ok (optional (element 'b')) "abc" Nothing
-        ok (optional (element 'a')) "" Nothing
-
-    , testCase "some" $ do
-        ok (some (element 'a')) "abc" (NE.fromList "a")
-        ok (some (element 'a')) "aabc" (NE.fromList "aa")
-        err (some (element 'b')) "abc"
-        err (some (element 'a')) ""
-
-    , testCase "many" $ do
-        ok (many (element 'a')) "abc" "a"
-        ok (many (element 'a')) "aabc" "aa"
-        ok (many (element 'b')) "abc" ""
-        ok (many (element 'a')) "" ""
-    ]
-  ]
-  where
-  ok :: (Eq a, Show a, HasCallStack) => p a -> Text -> a -> Assertion
-  ok p i o = run p "filename" i @?= Right o
-  err :: (Eq a, Show a, HasCallStack) => p a -> Text -> Assertion
-  err p i = assertBool "err" $ isLeft $ run p "filename" i
-
 reporterTests :: [TestTree]
 reporterTests =
   [ testCase "recover" $ do
-      run (element 'a' <* eof) "a" (Just 'a', 0)
-      run (element 'a') "b" (Nothing, 1)
-      run (recover (element 'a' <* eof) (element 'b')) "a" (Just 'a', 0)
-      run (recover (element 'a') (element 'b')) "b" (Just 'b', 1)
+      run (char 'a' <* eof) "a" (Just 'a', 0)
+      run (char 'a') "b" (Nothing, 1)
+      run (recover (char 'a' <* eof) (char 'b')) "a" (Just 'a', 0)
+      run (recover (char 'a') (char 'b')) "b" (Just 'b', 1)
       run ((,)
-            <$> recover (element 'a') (element 'b')
-            <*> recover (element 'a') (element 'c')) "bc" (Just ('b', 'c'), 2)
-      run (recover (element 'a') (element 'b') *>
-           recover (element 'a') (element 'c') *>
-           element 'a') "bcd" (Nothing, 3)
-      run (recover (element 'a' <* eof) (element 'b')) "c" (Nothing, 1)
+            <$> recover (char 'a') (char 'b')
+            <*> recover (char 'a') (char 'c')) "bc" (Just ('b', 'c'), 2)
+      run (recover (char 'a') (char 'b') *>
+           recover (char 'a') (char 'c') *>
+           char 'a') "bcd" (Nothing, 3)
+      run (recover (char 'a' <* eof) (char 'b')) "c" (Nothing, 1)
   ]
   where
   run :: (Eq a, Show a, HasCallStack) => Reporter Text a -> Text -> (Maybe a, Int) -> Assertion
@@ -718,10 +620,6 @@ linefold
 Fraction:
 fraction
 fractionHex
-
-Element Combinators:
-scanElements
-scanElements1
 
 Char Combinators:
 scanChars

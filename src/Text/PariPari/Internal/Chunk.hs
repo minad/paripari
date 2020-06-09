@@ -5,7 +5,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 module Text.PariPari.Internal.Chunk (
   Chunk(..)
-  , Chars(..)
   , Pos(..)
   , showByte
   , showByteString
@@ -39,19 +38,13 @@ data Pos = Pos
   , _posColumn :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
-class (Ord (Element k), Ord k) => Chunk k where
-  type Element  k
-  type Buffer   k
-  elementAt :: Buffer k -> Int -> (# Element k, Int #)
-  elementPos :: Element k -> Pos -> Pos
+class Ord k => Chunk k where
+  type Buffer k
   chunkWidth :: k -> Int
   chunkEqual :: Buffer k -> Int -> k -> Bool
   packChunk :: Buffer k -> Int -> Int -> k
   unpackChunk :: k -> (# Buffer k, Int, Int #)
-  showElement :: Element k -> String
   showChunk :: k -> String
-
-class Chunk k => Chars k where
   byteAt :: Buffer k -> Int -> Word8
   charAt :: Buffer k -> Int -> (# Char, Int #)
   charAtFixed :: Int -> Buffer k -> Int -> Char
@@ -59,16 +52,7 @@ class Chunk k => Chars k where
   stringToChunk :: String -> k
 
 instance Chunk ByteString where
-  type Element  ByteString = Word8
-  type Buffer   ByteString = ForeignPtr Word8
-
-  elementAt b i = (# ptrByteAt b i, 1 #)
-  {-# INLINE elementAt #-}
-
-  elementPos e (Pos l c) =
-    Pos (if e == asc_newline then l + 1 else l)
-        (if e == asc_newline then 1 else c + 1)
-  {-# INLINE elementPos #-}
+  type Buffer ByteString = ForeignPtr Word8
 
   chunkWidth (B.PS _ _ n) = n
   {-# INLINE chunkWidth #-}
@@ -84,10 +68,8 @@ instance Chunk ByteString where
     in (# b, i, n - 3 #)
   {-# INLINE unpackChunk #-}
 
-  showElement = showByte
   showChunk = showByteString
 
-instance Chars ByteString where
   byteAt = ptrByteAt
   {-# INLINE byteAt #-}
 
@@ -104,16 +86,7 @@ instance Chars ByteString where
   {-# INLINE stringToChunk #-}
 
 instance Chunk Text where
-  type Element  Text = Char
-  type Buffer   Text = T.Array
-
-  elementAt b i = arrayCharAt 2 b i
-  {-# INLINE elementAt #-}
-
-  elementPos e (Pos l c) =
-    Pos (if e == '\n' then l + 1 else l)
-        (if e == '\n' then 1 else c + 1)
-  {-# INLINE elementPos #-}
+  type Buffer Text = T.Array
 
   chunkWidth (T.Text _ _ n) = n
   {-# INLINE chunkWidth #-}
@@ -129,10 +102,8 @@ instance Chunk Text where
     in (# b, i, n - 1 #)
   {-# INLINE unpackChunk #-}
 
-  showElement = show
   showChunk = show
 
-instance Chars Text where
   byteAt = arrayByteAt
   {-# INLINE byteAt #-}
 

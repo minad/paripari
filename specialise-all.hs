@@ -11,9 +11,9 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-type StringType    = T.Text
-type ParserMonad p = CharParser StringType p
-type Parser a      = (forall p. ParserMonad p => p a)
+type StringType = T.Text
+type PMonad p = Parser StringType p
+type P a = (forall p. PMonad p => p a)
 
 data Type
   = TypeName   !StringType
@@ -32,34 +32,34 @@ data SourceLine
   | OtherLine     !StringType
   deriving (Show)
 
-source :: Parser [SourceLine]
+source :: P [SourceLine]
 source = sepBy sourceLine (char '\n') <* eof
 
-sourceLine :: Parser SourceLine
+sourceLine :: P SourceLine
 sourceLine = specialiseAll <|> typeDecl <|> otherLine
 
-otherLine :: Parser SourceLine
+otherLine :: P SourceLine
 otherLine = OtherLine <$> takeCharsWhile (/= '\n')
 
-specialiseAll :: Parser SourceLine
+specialiseAll :: P SourceLine
 specialiseAll = SpecialiseAll
   <$> (symbol "{-#" *> symbol "SPECIALISE_ALL" *> type_)
   <*> (symbol "=" *> type_ <* symbol "#-}")
 
-identifierAtom :: ParserMonad p => (Char -> Bool) -> p ()
+identifierAtom :: PMonad p => (Char -> Bool) -> p ()
 identifierAtom f = satisfy f *> skipCharsWhile (\c -> C.isAlphaNum c || c == '_' || c == '\'')
 
-name :: Parser StringType
+name :: P StringType
 name = asChunk (sepEndBy (identifierAtom C.isUpper) (char '.') *>
                 identifierAtom C.isLower) <* space
 
-typeName :: Parser StringType
+typeName :: P StringType
 typeName = asChunk (void $ sepBy1 (identifierAtom C.isUpper) (char '.')) <* space
 
-symbol :: ParserMonad p => String -> p StringType
+symbol :: PMonad p => String -> p StringType
 symbol s = string s <* space
 
-typeTuple :: Parser Type
+typeTuple :: P Type
 typeTuple = do
   ts <- between (symbol "(") (symbol ")") (sepBy type_ (symbol ","))
   pure $ case ts of
@@ -67,19 +67,19 @@ typeTuple = do
            [t] -> t
            _   -> TypeTuple ts
 
-typeAtom :: Parser Type
+typeAtom :: P Type
 typeAtom =
   TypeName <$> typeName
   <|> TypeVar <$> name
   <|> TypeList <$> between (symbol "[") (symbol "]") type_
   <|> typeTuple
 
-typeApp :: Parser Type
+typeApp :: P Type
 typeApp = do
   t <- typeAtom
   option t $ TypeApp t <$> some typeAtom
 
-type_ :: Parser Type
+type_ :: P Type
 type_ = do
   t <- typeApp
   TypeEq t <$> (symbol "~" *> type_)
@@ -87,10 +87,10 @@ type_ = do
     <|> TypeConstr t <$> (symbol "=>" *> type_)
     <|> pure t
 
-typeDecl :: Parser SourceLine
+typeDecl :: P SourceLine
 typeDecl = TypeDecl <$> sepBy1 name (symbol ",") <*> (symbol "::" *> type_)
 
-space :: Parser ()
+space :: P ()
 space = skipCharsWhile (== ' ')
 
 showType :: Type -> StringType
@@ -191,7 +191,7 @@ main = do
   case args of
     [src, _, dst] -> do
       code <- T.readFile src
-      let (result, reports) = runCharParser source src code
+      let (result, reports) = runParser source src code
       for_ reports $ putStrLn . showReport
       case result of
         Nothing -> pure ()

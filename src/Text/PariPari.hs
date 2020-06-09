@@ -1,17 +1,13 @@
 module Text.PariPari (
-  C.ChunkParser(..)
-  , C.CharParser(..)
+  C.Parser(..)
   , C.Error(..)
   , C.showError
 
-  , K.Chunk(Element, showElement, showChunk)
-  , K.Chars
+  , K.Chunk(showChunk)
   , K.Pos(..)
 
-  , U.runCharParser
-  , U.runCharParserWithOptions
-  , U.runChunkParser
-  , U.runChunkParserWithOptions
+  , U.runParser
+  , U.runParserWithOptions
 
   , A.Acceptor
   , A.runAcceptor
@@ -26,12 +22,10 @@ module Text.PariPari (
   , R.runReporterWithOptions
   , R.defaultReportOptions
 
-  , module Text.PariPari.Internal.ElementCombinators
-  , module Text.PariPari.Internal.CharCombinators
+  , module Text.PariPari.Internal.Combinators
 ) where
 
-import Text.PariPari.Internal.CharCombinators
-import Text.PariPari.Internal.ElementCombinators
+import Text.PariPari.Internal.Combinators
 import qualified Text.PariPari.Internal.Acceptor as A
 import qualified Text.PariPari.Internal.Chunk as K
 import qualified Text.PariPari.Internal.Class as C

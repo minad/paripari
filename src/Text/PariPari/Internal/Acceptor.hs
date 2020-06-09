@@ -126,7 +126,7 @@ instance Chunk k => Fail.MonadFail (Acceptor k) where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance Chunk k => ChunkParser k (Acceptor k) where
+instance Chunk k => Parser k (Acceptor k) where
   getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
   {-# INLINE getPos #-}
 
@@ -173,26 +173,6 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   recover p _ = p
   {-# INLINE recover #-}
 
-  element e = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-    if | _stOff < _envEnd env,
-         (# e', w #) <- elementAt @k (_envBuf env) _stOff,
-         e == e',
-         pos <- elementPos @k e (Pos _stLine _stColumn) ->
-           Ok# (# _stOff + w, _posLine pos, _posColumn pos #) e
-       | otherwise ->
-           Err#
-  {-# INLINE element #-}
-
-  elementScan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-    if | _stOff < _envEnd env,
-         (# e, w #) <- elementAt @k (_envBuf env) _stOff,
-         Just r <- f e,
-         pos <- elementPos @k e (Pos _stLine _stColumn) ->
-           Ok# (# _stOff + w, _posLine pos, _posColumn pos #) r
-       | otherwise ->
-           Err#
-  {-# INLINE elementScan #-}
-
   chunk k = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     let n = chunkWidth @k k
     in if n + _stOff <= _envEnd env &&
@@ -210,7 +190,6 @@ instance Chunk k => ChunkParser k (Acceptor k) where
     pure $ packChunk src begin (end - begin)
   {-# INLINE asChunk #-}
 
-instance Chars k => CharParser k (Acceptor k) where
   scan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
@@ -260,7 +239,7 @@ instance Chars k => CharParser k (Acceptor k) where
           Err#
   {-# INLINE asciiByte #-}
 
-instance Chars k => IsString (Acceptor k k) where
+instance Chunk k => IsString (Acceptor k k) where
   fromString = string
   {-# INLINE fromString #-}
 

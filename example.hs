@@ -9,14 +9,14 @@ import System.Environment (getArgs)
 import Text.PariPari
 import qualified Data.ByteString as B
 
-type StringType    = B.ByteString
-type ParserMonad p = CharParser StringType p
-type Parser a      = (forall p. ParserMonad p => p a)
+type StringType = B.ByteString
+type PMonad p = Parser StringType p
+type P a = (forall p. PMonad p => p a)
 
--- {-# SPECIALISE_ALL ParserMonad p = p ~ Acceptor StringType #-}
--- {-# SPECIALISE_ALL ParserMonad p = p ~ Reporter StringType #-}
--- {-# SPECIALISE_ALL Parser = Acceptor StringType #-}
--- {-# SPECIALISE_ALL Parser = Reporter StringType #-}
+-- {-# SPECIALISE_ALL PMonad p = p ~ Acceptor StringType #-}
+-- {-# SPECIALISE_ALL PMonad p = p ~ Reporter StringType #-}
+-- {-# SPECIALISE_ALL P = Acceptor StringType #-}
+-- {-# SPECIALISE_ALL P = Reporter StringType #-}
 
 data Value
   = Object ![(StringType, Value)]
@@ -27,19 +27,19 @@ data Value
   | Null
   deriving (Eq, Show)
 
-json :: Parser Value
+json :: P Value
 json = space *> (object <|> array) <?> "json"
 
-object :: Parser Value
+object :: P Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser (StringType, Value)
+pair :: P (StringType, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 
-array :: Parser Value
+array :: P Value
 array = Array <$> (char '[' *> sepBy value (space *> char ',' *> space) <* space <* char ']') <?> "array"
 
-value :: Parser Value
+value :: P Value
 value =
   (String <$> text)
     <|> object
@@ -49,10 +49,10 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser StringType
+text :: P StringType
 text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 
-number :: Parser Value
+number :: P Value
 number = label "number" $ do
   neg <- sign
   frac <- fractionDec (pure ())
@@ -60,7 +60,7 @@ number = label "number" $ do
            Left n -> Number (neg n) 0
            Right (c, _, e) -> Number (neg c) e
 
-space :: Parser ()
+space :: P ()
 space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 
 main :: IO ()
@@ -69,7 +69,7 @@ main = do
   case args of
     [file] -> do
       src <- B.readFile file
-      let (result, reports) = runCharParser json file src
+      let (result, reports) = runParser json file src
       for_ reports $ putStrLn . showReport
       print result
     _ -> error "Usage: paripari-example test.json"

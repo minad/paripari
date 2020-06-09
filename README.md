@@ -68,24 +68,24 @@ Note that even in the case of `ByteStrings` a `CharParser` instance
 is provided, which interprets the bytes as UTF-8.
 
 ``` haskell
-type StringType    = B.ByteString
-type ParserMonad p = CharParser StringType p
-type Parser a      = (forall p. ParserMonad p => p a)
+type StringType = B.ByteString
+type PMonad p = Parser StringType p
+type P a = (forall p. PMonad p => p a)
 ```
 
-The `Parser` shortcut can be used for simple combinators.
-For functions returning parsers, the `ParserMonad` constraint must
-be used for specialization to work, e.g., `char :: ParserMonad p => Char -> p Char`.
+The `P` shortcut can be used for simple combinators.
+For functions returning parsers, the `PMonad` constraint must
+be used for specialization to work, e.g., `char :: PMonad p => Char -> p Char`.
 
 Now we ensure that the GHC specialiser kicks in
 and specialises all parsers. These pragmas are processed
 by the preprocessor `paripari-specialise-all`.
 
 ``` haskell
-{-# SPECIALISE_ALL ParserMonad p = p ~ Acceptor StringType #-}
-{-# SPECIALISE_ALL ParserMonad p = p ~ Reporter StringType #-}
-{-# SPECIALISE_ALL Parser = Acceptor StringType #-}
-{-# SPECIALISE_ALL Parser = Reporter StringType #-}
+{-# SPECIALISE_ALL PMonad p = p ~ Acceptor StringType #-}
+{-# SPECIALISE_ALL PMonad p = p ~ Reporter StringType #-}
+{-# SPECIALISE_ALL P = Acceptor StringType #-}
+{-# SPECIALISE_ALL P = Reporter StringType #-}
 ```
 
 ### JSON datatype
@@ -108,31 +108,31 @@ data Value
 A JSON toplevel value is either an object or an array.
 
 ``` haskell
-json :: Parser Value
+json :: P Value
 json = space *> (object <|> array) <?> "json"
 ```
 
 Objects consist of pairs of a text string and a value.
 
 ``` haskell
-object :: Parser Value
+object :: P Value
 object = Object <$> (char '{' *> space *> sepBy pair (space *> char ',' *> space) <* space <* char '}') <?> "object"
 
-pair :: Parser (StringType, Value)
+pair :: P (StringType, Value)
 pair = (,) <$> (text <* space) <*> (char ':' *> space *> value)
 ```
 
 Arrays are a list of values.
 
 ``` haskell
-array :: Parser Value
+array :: P Value
 array = Array <$> (char '[' *> sepBy value (space *> char ',' *> space) <* space <* char ']') <?> "array"
 ```
 
 Furthermore, JSON supports text strings, boolean values, null and floating point numbers.
 
 ``` haskell
-value :: Parser Value
+value :: P Value
 value =
   (String <$> text)
     <|> object
@@ -142,7 +142,7 @@ value =
     <|> (Null       <$ string "null")
     <|> number
 
-text :: Parser StringType
+text :: P StringType
 text = char '"' *> takeCharsWhile (/= '"') <* char '"' <?> "text"
 ```
 
@@ -151,7 +151,7 @@ the base of the exponent and the exponent. The conversion to `Double` can be don
 for example by the `scientific` library.
 
 ``` haskell
-number :: Parser Value
+number :: P Value
 number = label "number" $ do
   neg <- sign
   frac <- fractionDec (pure ())
@@ -163,7 +163,7 @@ number = label "number" $ do
 For spaces we need another helper function.
 
 ``` haskell
-space :: Parser ()
+space :: P ()
 space = skipCharsWhile (\c -> c == ' ' || c == '\n' || c == '\t')
 ```
 
@@ -180,7 +180,7 @@ main = do
   case args of
     [file] -> do
       src <- B.readFile file
-      let (result, reports) = runCharParser json file src
+      let (result, reports) = runParser json file src
       for_ reports $ putStrLn . showReport
       print result
     _ -> error "Usage: paripari-example test.json"

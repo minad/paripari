@@ -154,7 +154,7 @@ instance Chunk k => Fail.MonadFail (Reporter k) where
   fail msg = failWith $ EFail msg
   {-# INLINE fail #-}
 
-instance Chunk k => ChunkParser k (Reporter k) where
+instance Chunk k => Parser k (Reporter k) where
   getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
   {-# INLINE getPos #-}
 
@@ -204,28 +204,6 @@ instance Chunk k => ChunkParser k (Reporter k) where
     in unReporter p env st ok err1
   {-# INLINE recover #-}
 
-  element e = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    if | _stOff < _envEnd env,
-         (# e', w #) <- elementAt @k (_envBuf env) _stOff,
-         e == e',
-         pos <- elementPos @k e (Pos _stLine _stColumn) ->
-           ok e st { _stOff =_stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
-       | otherwise ->
-           raiseError env st err $ EExpected [showElement @k e]
-  {-# INLINE element #-}
-
-  elementScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    let (# e, w #) = elementAt @k (_envBuf env) _stOff
-    in if | _stOff >= _envEnd env ->
-              raiseError env st err unexpectedEnd
-          | _stOff < _envEnd env,
-            Just r <- f e,
-            pos <- elementPos @k e (Pos _stLine _stColumn) ->
-              ok r st { _stOff =_stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }
-          | otherwise ->
-              raiseError env st err $ EUnexpected $ showElement @k e
-  {-# INLINE elementScan #-}
-
   chunk k = Reporter $ \env st@State{_stOff,_stColumn} ok err ->
     let n = chunkWidth @k k
     in if n + _stOff <= _envEnd env &&
@@ -243,7 +221,6 @@ instance Chunk k => ChunkParser k (Reporter k) where
     pure $ packChunk src begin (end - begin)
   {-# INLINE asChunk #-}
 
-instance Chars k => CharParser k (Reporter k) where
   scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
          c /= '\0' ->
@@ -308,7 +285,7 @@ instance Chars k => CharParser k (Reporter k) where
           raiseError env st err $ EExpected [showByte b]
   {-# INLINE asciiByte #-}
 
-instance Chars k => IsString (Reporter k k) where
+instance Chunk k => IsString (Reporter k k) where
   fromString = string
   {-# INLINE fromString #-}
 
