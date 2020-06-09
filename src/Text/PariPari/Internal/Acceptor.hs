@@ -7,10 +7,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE MagicHash #-}
 module Text.PariPari.Internal.Acceptor (
   Acceptor(..)
   , Env(..)
-  , State(..)
   , get
   , local
   , runAcceptor
@@ -31,16 +32,32 @@ data Env k = Env
   , _envRefColumn :: {-#UNPACK#-}!Int
   }
 
-data State = State
-  { _stOff    :: {-#UNPACK#-}!Int
-  , _stLine   :: {-#UNPACK#-}!Int
-  , _stColumn :: {-#UNPACK#-}!Int
-  }
+type State = (# Int, Int, Int #)
+
+type Result# a = (# () | (# State, a #) #)
+pattern Ok# :: State -> a -> Result# a
+pattern Ok# s a = (# | (# s, a #) #)
+
+pattern Err# :: Result# a
+pattern Err# = (# () | #)
+{-# COMPLETE Ok#, Err# #-}
+
+_stLine :: State -> Int
+_stLine (# _, x, _ #) = x
+{-# INLINE _stLine #-}
+
+_stColumn :: State -> Int
+_stColumn (# _, _, x #) = x
+{-# INLINE _stColumn #-}
+
+_stOff :: State -> Int
+_stOff (# x, _, _ #) = x
+{-# INLINE _stOff #-}
 
 -- | Parser which is optimised for fast parsing. Error reporting
 -- is minimal.
 newtype Acceptor k a = Acceptor
-  { unAcceptor :: Env k -> State -> Maybe (State, a) }
+  { unAcceptor :: Env k -> State -> Result# a }
 
 instance (Chunk k, Semigroup a) => Sem.Semigroup (Acceptor k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
@@ -54,18 +71,20 @@ instance (Chunk k, Semigroup a, Monoid a) => Monoid (Acceptor k a) where
   {-# INLINE mappend #-}
 
 instance Functor (Acceptor k) where
-  fmap f p = Acceptor $ \env st ->
-    (fmap.fmap) f (unAcceptor p env st)
+  fmap f p = Acceptor $ \env st -> case unAcceptor p env st of
+    Err# -> Err#
+    Ok# st' x -> Ok# st' (f x)
   {-# INLINE fmap #-}
 
 instance Chunk k => Applicative (Acceptor k) where
-  pure x = Acceptor $ \_ st -> Just (st, x)
+  pure x = Acceptor $ \_ st -> Ok# st x
   {-# INLINE pure #-}
 
-  f <*> a = Acceptor $ \env st -> do
-    (s, f') <- unAcceptor f env st
-    (s', a') <- unAcceptor a env s
-    pure (s', f' a')
+  f <*> a = Acceptor $ \env st -> case unAcceptor f env st of
+    Err# -> Err#
+    Ok# s f' -> case unAcceptor a env s of
+      Err# -> Err#
+      Ok# s' a' -> Ok# s' (f' a')
   {-# INLINE (<*>) #-}
 
   p1 *> p2 = do
@@ -80,19 +99,22 @@ instance Chunk k => Applicative (Acceptor k) where
   {-# INLINE (<*) #-}
 
 instance Chunk k => Alternative (Acceptor k) where
-  empty = Acceptor $ \_ _ -> Nothing
+  empty = Acceptor $ \_ _ -> Err#
   {-# INLINE empty #-}
 
   p1 <|> p2 = Acceptor $ \env st ->
-    unAcceptor p1 env st <|> unAcceptor p2 env st
+    case unAcceptor p1 env st of
+      Ok# st' x -> Ok# st' x
+      Err# -> unAcceptor p2 env st
   {-# INLINE (<|>) #-}
 
 instance Chunk k => MonadPlus (Acceptor k)
 
 instance Chunk k => Monad (Acceptor k) where
-  p >>= f = Acceptor $ \env st -> do
-    (s, x) <- unAcceptor p env st
-    unAcceptor (f x) env s
+  p >>= f = Acceptor $ \env st ->
+    case unAcceptor p env st of
+      Err# -> Err#
+      Ok# s x -> unAcceptor (f x) env s
   {-# INLINE (>>=) #-}
 
 #if !MIN_VERSION_base(4,11,0)
@@ -119,23 +141,24 @@ instance Chunk k => ChunkParser k (Acceptor k) where
 
   notFollowedBy p = Acceptor $ \env st ->
     case unAcceptor p env st of
-      Nothing -> Just (st, ())
-      Just{} -> Nothing
+      Err# -> Ok# st ()
+      Ok# _ _ -> Err#
   {-# INLINE notFollowedBy #-}
 
   lookAhead p = Acceptor $ \env st -> do
-    (_, x) <- unAcceptor p env st
-    pure (st, x)
+    case unAcceptor p env st of
+      Err# -> Err#
+      Ok# _ x -> Ok# st x
   {-# INLINE lookAhead #-}
 
-  failWith _ = Acceptor $ \_ _ -> Nothing
+  failWith _ = Acceptor $ \_ _ -> Err#
   {-# INLINE failWith #-}
 
   eof = Acceptor $ \env st ->
     if _stOff st >= _envEnd env then
-      Just (st, ())
+      Ok# st ()
     else
-      Nothing
+      Err#
   {-# INLINE eof #-}
 
   label _ p = p
@@ -150,33 +173,33 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   recover p _ = p
   {-# INLINE recover #-}
 
-  element e = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+  element e = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     if | _stOff < _envEnd env,
          (# e', w #) <- elementAt @k (_envBuf env) _stOff,
          e == e',
          pos <- elementPos @k e (Pos _stLine _stColumn) ->
-           Just (st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }, e)
+           Ok# (# _stOff + w, _posLine pos, _posColumn pos #) e
        | otherwise ->
-           Nothing
+           Err#
   {-# INLINE element #-}
 
-  elementScan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+  elementScan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     if | _stOff < _envEnd env,
          (# e, w #) <- elementAt @k (_envBuf env) _stOff,
          Just r <- f e,
          pos <- elementPos @k e (Pos _stLine _stColumn) ->
-           Just (st { _stOff = _stOff + w, _stLine = _posLine pos, _stColumn = _posColumn pos }, r)
+           Ok# (# _stOff + w, _posLine pos, _posColumn pos #) r
        | otherwise ->
-           Nothing
+           Err#
   {-# INLINE elementScan #-}
 
-  chunk k = Acceptor $ \env st@State{_stOff,_stColumn} ->
+  chunk k = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     let n = chunkWidth @k k
     in if n + _stOff <= _envEnd env &&
           chunkEqual @k (_envBuf env) _stOff k then
-         Just (st { _stOff = _stOff + n, _stColumn = _stColumn + n }, k)
+         Ok# (# _stOff + n, _stLine, _stColumn + n #) k
        else
-         Nothing
+         Err#
   {-# INLINE chunk #-}
 
   asChunk p = do
@@ -188,17 +211,15 @@ instance Chunk k => ChunkParser k (Acceptor k) where
   {-# INLINE asChunk #-}
 
 instance Chars k => CharsParser k (Acceptor k) where
-  scan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+  scan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
          c /= '\0',
          Just r <- f c ->
-           Just (st
-                 { _stOff = _stOff + w
-                 , _stLine = if c == '\n' then _stLine + 1 else _stLine
-                 , _stColumn = if c == '\n' then 1 else _stColumn + 1
-                 }, r)
+           Ok# (# _stOff + w,
+                 if c == '\n' then _stLine + 1 else _stLine,
+                 if c == '\n' then 1 else _stColumn + 1 #) r
        | otherwise ->
-           Nothing
+           Err#
   {-# INLINE scan #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
@@ -206,40 +227,37 @@ instance Chars k => CharsParser k (Acceptor k) where
   char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
   char c
     | w <- charWidth @k c =
-        Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+        Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
         if charAtFixed @k w (_envBuf env) _stOff == c then
-          Just (st { _stOff = _stOff + w
-                   , _stLine = if c == '\n' then _stLine + 1 else _stLine
-                   , _stColumn = if c == '\n' then 1 else _stColumn + 1
-                   }, c)
+          Ok# (# _stOff + w,
+                if c == '\n' then _stLine + 1 else _stLine,
+                if c == '\n' then 1 else _stColumn + 1 #) c
         else
-          Nothing
+          Err#
   {-# INLINE char #-}
 
-  asciiScan f = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+  asciiScan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
     if | b <- byteAt @k (_envBuf env) _stOff,
          b /= 0,
          b < 128,
          Just x <- f b ->
-           Just (st { _stOff = _stOff + 1
-                    , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-                    , _stColumn = if b == asc_newline then 1 else _stColumn + 1
-                    }, x)
+           Ok# (# _stOff + 1
+               , if b == asc_newline then _stLine + 1 else _stLine
+               , if b == asc_newline then 1 else _stColumn + 1 #) x
        | otherwise ->
-           Nothing
+           Err#
   {-# INLINE asciiScan #-}
 
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
-    | otherwise = Acceptor $ \env st@State{_stOff, _stLine, _stColumn} ->
+    | otherwise = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
         if byteAt @k (_envBuf env) _stOff == b then
-          Just (st { _stOff = _stOff + 1
-                   , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-                   , _stColumn = if b == asc_newline then 1 else _stColumn + 1
-                   }, b)
+          Ok# (# _stOff + 1
+              , if b == asc_newline then _stLine + 1 else _stLine
+              , if b == asc_newline then 1 else _stColumn + 1 #) b
         else
-          Nothing
+          Err#
   {-# INLINE asciiByte #-}
 
 instance Chars k => IsString (Acceptor k k) where
@@ -248,7 +266,7 @@ instance Chars k => IsString (Acceptor k k) where
 
 -- | Reader monad, get something from the environment
 get :: (Env k -> State -> a) -> Acceptor k a
-get f = Acceptor $ \env st -> pure (st, f env st)
+get f = Acceptor $ \env st -> Ok# st (f env st)
 {-# INLINE get #-}
 
 -- | Reader monad, modify environment locally
@@ -262,7 +280,9 @@ local f p = Acceptor $ \env st ->
 runAcceptor :: Chunk k => Acceptor k a -> FilePath -> k -> Maybe a
 runAcceptor p f k =
   let (# b, off, len #) = unpackChunk k
-  in snd <$> unAcceptor p (initialEnv f b (off + len)) (initialState off)
+  in case unAcceptor p (initialEnv f b (off + len)) (# off, 1, 1 #) of
+       Err# -> Nothing
+       Ok# _ x -> Just x
 
 initialEnv :: FilePath -> Buffer k -> Int -> Env k
 initialEnv _envFile _envBuf _envEnd = Env
@@ -271,11 +291,4 @@ initialEnv _envFile _envBuf _envEnd = Env
   , _envEnd
   , _envRefLine = 1
   , _envRefColumn = 1
-  }
-
-initialState :: Int -> State
-initialState _stOff = State
-  { _stOff
-  , _stLine = 1
-  , _stColumn = 1
   }
