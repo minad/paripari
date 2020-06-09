@@ -66,7 +66,6 @@ data Env k = Env
   , _envHidden    :: !Bool
   , _envContext   :: [String]
   , _envEnd       :: Int#
-  , _envCommit    :: {-#UNPACK#-}!Int
   , _envRefLine   :: {-#UNPACK#-}!Int
   , _envRefColumn :: {-#UNPACK#-}!Int
   }
@@ -78,7 +77,6 @@ data State = State
   , _stErrOff    :: {-#UNPACK#-}!Int
   , _stErrLine   :: {-#UNPACK#-}!Int
   , _stErrColumn :: {-#UNPACK#-}!Int
-  , _stErrCommit :: {-#UNPACK#-}!Int
   , _stErrors    :: [ErrorContext]
   , _stReports   :: [Report]
   }
@@ -317,17 +315,13 @@ addLabel l env = case _envContext env of
 -- Furthermore the error is merged with existing errors if possible.
 addError :: Env k -> State -> Error -> State
 addError env st e
-  | I# (_stOff st) > _stErrOff st || _envCommit env > _stErrCommit st,
+  | I# (_stOff st) > _stErrOff st,
     Just e' <- mkError env e =
       st { _stErrors    = [e']
          , _stErrOff    = I# (_stOff st)
          , _stErrLine   = _stLine st
          , _stErrColumn = _stColumn st
-         , _stErrCommit = _envCommit env
          }
-  | I# (_stOff st) == _stErrOff st && _envCommit env == _stErrCommit st,
-    Just e' <- mkError env e =
-      st { _stErrors = shrinkErrors env $ e' : _stErrors st }
   | otherwise = st
 {-# INLINE addError #-}
 
@@ -341,14 +335,13 @@ mkError env e
 -- | Merge errors of two states, used when backtracking
 mergeErrorState :: Env k -> State -> State -> State
 mergeErrorState env s s'
-  | _stErrOff s' > _stErrOff s || _stErrCommit s' > _stErrCommit s =
+  | _stErrOff s' > _stErrOff s =
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
         , _stErrLine   = _stErrLine s'
         , _stErrColumn = _stErrColumn s'
-        , _stErrCommit = _stErrCommit s'
         }
-  | _stErrOff s' == _stErrOff s && _stErrCommit s' == _stErrCommit s =
+  | _stErrOff s' == _stErrOff s =
       s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
   | otherwise = s
 {-# INLINE mergeErrorState #-}
@@ -415,7 +408,6 @@ initialEnv _envOptions _envFile _envBuf _envEnd = Env
   , _envEnd
   , _envContext   = []
   , _envHidden    = False
-  , _envCommit    = 0
   , _envRefLine   = 1
   , _envRefColumn = 1
   }
@@ -428,7 +420,6 @@ initialState _stOff = State
   , _stErrOff    = 0
   , _stErrLine   = 0
   , _stErrColumn = 0
-  , _stErrCommit = 0
   , _stErrors    = []
   , _stReports   = []
   }
