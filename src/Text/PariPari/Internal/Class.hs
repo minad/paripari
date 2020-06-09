@@ -2,7 +2,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 module Text.PariPari.Internal.Class (
   ChunkParser(..)
-  , CharsParser(..)
+  , CharParser(..)
   , Alternative(..)
   , MonadPlus
   , Pos(..)
@@ -124,7 +124,7 @@ class (MonadFail p, MonadPlus p, Chunk k) => ChunkParser k p | p -> k where
   -- result as buffer
   asChunk :: p () -> p k
 
-class (ChunkParser k p, IsString (p k), Chars k) => CharsParser k p | p -> k where
+class (ChunkParser k p, IsString (p k), Chars k) => CharParser k p | p -> k where
   -- | Parse a single character
   --
   -- __Note__: The character '\0' cannot be parsed using this combinator
@@ -166,6 +166,6 @@ unexpectedEnd :: Error
 unexpectedEnd = EUnexpected "end of file"
 
 -- | Parse a string
-string :: CharsParser k p => String -> p k
+string :: CharParser k p => String -> p k
 string t = chunk (stringToChunk t)
 {-# INLINE string #-}

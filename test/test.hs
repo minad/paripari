@@ -77,10 +77,10 @@ tests = testGroup "Tests"
   , testGroup "Reporter specific" reporterTests
   ]
 
-charTests :: forall k p e. (CharsParser k p, Chars k, Eq e, Show e, Show k)
+charTests :: forall k p e. (CharParser k p, Chars k, Eq e, Show e, Show k)
           => (forall a. p a -> FilePath -> k -> Either e a) -> [TestTree]
 charTests run =
-  [ testGroup "CharsParser" $
+  [ testGroup "CharParser" $
     [ testCase "char" $ do
         ok (char 'a') "abc" 'a'
         ok (char 'a' <* eof) "a" 'a'

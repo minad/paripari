@@ -1,7 +1,7 @@
 {-# LANGUAGE Rank2Types #-}
 module Text.PariPari.Internal.Run (
-  runCharsParser
-  , runCharsParserWithOptions
+  runCharParser
+  , runCharParserWithOptions
   , runChunkParser
   , runChunkParserWithOptions
 ) where
@@ -15,19 +15,19 @@ import Text.PariPari.Internal.Reporter
 -- The 'FilePath' is used for error reporting.
 -- When the acceptor does not return successfully, the result from the reporter
 -- is awaited.
-runCharsParser :: Chars k => (forall p. CharsParser k p => p a) -> FilePath -> k -> (Maybe a, [Report])
-runCharsParser = runCharsParserWithOptions defaultReportOptions
-{-# INLINE runCharsParser #-}
+runCharParser :: Chars k => (forall p. CharParser k p => p a) -> FilePath -> k -> (Maybe a, [Report])
+runCharParser = runCharParserWithOptions defaultReportOptions
+{-# INLINE runCharParser #-}
 
 -- | Run parsers with additional 'ReportOptions'.
-runCharsParserWithOptions :: Chars k => ReportOptions -> (forall p. CharsParser k p => p a) -> FilePath -> k -> (Maybe a, [Report])
-runCharsParserWithOptions o p f b =
+runCharParserWithOptions :: Chars k => ReportOptions -> (forall p. CharParser k p => p a) -> FilePath -> k -> (Maybe a, [Report])
+runCharParserWithOptions o p f b =
   let a = runAcceptor p f b
       r = runReporterWithOptions o p f b
   in case a of
        Nothing  -> r
        Just x -> (Just x, [])
-{-# INLINE runCharsParserWithOptions #-}
+{-# INLINE runCharParserWithOptions #-}
 
 -- | Rsun fast 'Acceptor' and slower 'Reporter' on the given chunk sequentially.
 -- The 'FilePath' is used for error reporting.

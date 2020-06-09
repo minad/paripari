@@ -22,7 +22,7 @@ newtype Tracer k a = Tracer { unTracer :: Reporter k a }
   deriving (Sem.Semigroup, Monoid, Functor, Applicative, MonadPlus, Monad, Fail.MonadFail)
 
 deriving instance Chars k => ChunkParser k (Tracer k)
-deriving instance Chars k => CharsParser k (Tracer k)
+deriving instance Chars k => CharParser k (Tracer k)
 deriving instance Chars k => IsString (Tracer k k)
 
 instance Chunk k => Alternative (Tracer k) where

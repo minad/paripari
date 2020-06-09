@@ -1,6 +1,6 @@
 module Text.PariPari (
   C.ChunkParser(..)
-  , C.CharsParser(..)
+  , C.CharParser(..)
   , C.Error(..)
   , C.showError
 
@@ -8,8 +8,8 @@ module Text.PariPari (
   , K.Chars
   , K.Pos(..)
 
-  , U.runCharsParser
-  , U.runCharsParserWithOptions
+  , U.runCharParser
+  , U.runCharParserWithOptions
   , U.runChunkParser
   , U.runChunkParserWithOptions
 
