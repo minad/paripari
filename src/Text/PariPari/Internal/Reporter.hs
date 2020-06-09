@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -8,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE MagicHash #-}
 module Text.PariPari.Internal.Reporter (
   Reporter(..)
   , Env(..)
@@ -29,9 +31,10 @@ module Text.PariPari.Internal.Reporter (
 import Control.Monad (void)
 import Data.Function (on)
 import Data.List (intercalate, sort, group, sortOn)
-import Data.List.NonEmpty (NonEmpty(..))
 import Data.Semigroup as Sem
 import Data.String (IsString(..))
+import GHC.Base
+import GHC.Word
 import GHC.Generics (Generic)
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
@@ -62,14 +65,14 @@ data Env k = Env
   , _envOptions   :: !ReportOptions
   , _envHidden    :: !Bool
   , _envContext   :: [String]
+  , _envEnd       :: Int#
   , _envCommit    :: {-#UNPACK#-}!Int
-  , _envEnd       :: {-#UNPACK#-}!Int
   , _envRefLine   :: {-#UNPACK#-}!Int
   , _envRefColumn :: {-#UNPACK#-}!Int
   }
 
 data State = State
-  { _stOff       :: {-#UNPACK#-}!Int
+  { _stOff       :: Int#
   , _stLine      :: {-#UNPACK#-}!Int
   , _stColumn    :: {-#UNPACK#-}!Int
   , _stErrOff    :: {-#UNPACK#-}!Int
@@ -191,10 +194,9 @@ instance Chunk k => Parser k (Reporter k) where
   {-# INLINE failWith #-}
 
   eof = Reporter $ \env st ok err ->
-    if _stOff st >= _envEnd env then
-      ok () st
-    else
-      raiseError env st err expectedEnd
+    case _stOff st >=# _envEnd env of
+      1# -> ok () st
+      _ -> raiseError env st err expectedEnd
   {-# INLINE eof #-}
 
   recover p r = Reporter $ \env st ok err ->
@@ -206,34 +208,33 @@ instance Chunk k => Parser k (Reporter k) where
 
   chunk k = Reporter $ \env st@State{_stOff,_stColumn} ok err ->
     let n = chunkWidth @k k
-    in if n + _stOff <= _envEnd env &&
-          chunkEqual @k (_envBuf env) _stOff k then
-         ok k st { _stOff = _stOff + n, _stColumn = _stColumn + n }
-       else
-         raiseError env st err $ EExpected [showChunk @k k]
+    in if | 1# <- n +# _stOff <=# _envEnd env,
+            chunkEqual @k (_envBuf env) _stOff k ->
+            ok k st { _stOff = _stOff +# n, _stColumn = _stColumn + I# n }
+          | otherwise -> raiseError env st err $ EExpected [showChunk @k k]
   {-# INLINE chunk #-}
 
   asChunk p = do
-    begin <- get (const _stOff)
+    I# begin' <- get (const (\s -> I# (_stOff s)))
     p
-    end <- get (const _stOff)
+    I# end' <- get (const (\s -> I# (_stOff s)))
     src <- get (\env _ -> _envBuf env)
-    pure $ packChunk src begin (end - begin)
+    pure $ packChunk src begin' (end' -# begin')
   {-# INLINE asChunk #-}
 
   scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
     if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
-         c /= '\0' ->
-           case f c of
+         1# <- c `neChar#` '\0'# ->
+           case f (C# c) of
              Just r ->
                ok r st
-               { _stOff = _stOff + w
-               , _stLine = if c == '\n' then _stLine + 1 else _stLine
-               , _stColumn = if c == '\n' then 1 else _stColumn + 1
+               { _stOff = _stOff +# w
+               , _stLine = case c `eqChar#` '\n'# of 1# -> _stLine + 1; _ -> _stLine
+               , _stColumn = case c `eqChar#` '\n'# of 1# -> 1; _ -> _stColumn + 1
                }
              Nothing ->
-               raiseError env st err $ EUnexpected $ show c
-       | _stOff >= _envEnd env ->
+               raiseError env st err $ EUnexpected $ show (C# c)
+       | 1# <- _stOff >=# _envEnd env ->
            raiseError env st err unexpectedEnd
        | otherwise ->
            raiseError env st err EInvalidUtf8
@@ -245,9 +246,9 @@ instance Chunk k => Parser k (Reporter k) where
   char c
     | w <- charWidth @k c =
         Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-        if charAtFixed @k w (_envBuf env) _stOff == c then
+        if C# (charAtFixed @k w (_envBuf env) _stOff) == c then
           ok c st
-          { _stOff = _stOff + w
+          { _stOff = _stOff +# w
           , _stLine = if c == '\n' then _stLine + 1 else _stLine
           , _stColumn = if c == '\n' then 1 else _stColumn + 1
           }
@@ -256,16 +257,16 @@ instance Chunk k => Parser k (Reporter k) where
   {-# INLINE char #-}
 
   asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    let b = byteAt @k (_envBuf env) _stOff
+    let b = W8# (byteAt @k (_envBuf env) _stOff)
     in if | b /= 0,
             b < 128,
             Just x <- f b ->
               ok x st
-              { _stOff = _stOff + 1
+              { _stOff = _stOff +# 1#
               , _stLine = if b == asc_newline then _stLine + 1 else _stLine
               , _stColumn = if b == asc_newline then 1 else _stColumn + 1
               }
-          | _stOff >= _envEnd env ->
+          | 1# <- _stOff >=# _envEnd env ->
               raiseError env st err unexpectedEnd
           | otherwise ->
               raiseError env st err $ EUnexpected $ showByte b
@@ -275,9 +276,9 @@ instance Chunk k => Parser k (Reporter k) where
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
     | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-        if byteAt @k (_envBuf env) _stOff == b then
+        if W8# (byteAt @k (_envBuf env) _stOff) == b then
           ok b st
-          { _stOff = _stOff + 1
+          { _stOff = _stOff +# 1#
           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
           , _stColumn = if b == asc_newline then 1 else _stColumn + 1
           }
@@ -316,15 +317,15 @@ addLabel l env = case _envContext env of
 -- Furthermore the error is merged with existing errors if possible.
 addError :: Env k -> State -> Error -> State
 addError env st e
-  | _stOff st > _stErrOff st || _envCommit env > _stErrCommit st,
+  | I# (_stOff st) > _stErrOff st || _envCommit env > _stErrCommit st,
     Just e' <- mkError env e =
       st { _stErrors    = [e']
-         , _stErrOff    = _stOff st
+         , _stErrOff    = I# (_stOff st)
          , _stErrLine   = _stLine st
          , _stErrColumn = _stColumn st
          , _stErrCommit = _envCommit env
          }
-  | _stOff st == _stErrOff st && _envCommit env == _stErrCommit st,
+  | I# (_stOff st) == _stErrOff st && _envCommit env == _stErrCommit st,
     Just e' <- mkError env e =
       st { _stErrors = shrinkErrors env $ e' : _stErrors st }
   | otherwise = st
@@ -387,8 +388,8 @@ defaultReportOptions = ReportOptions
 -- | Run 'Reporter' with additional 'ReportOptions'.
 runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporterWithOptions o p f k =
-  let (# b, off, len #) = unpackChunk k
-      env = initialEnv o f b (off + len)
+  let !(# b, off, len #) = unpackChunk k
+      env = initialEnv o f b (off +# len)
       ok x s = (Just x, reverse $ _stReports s)
       err s = (Nothing, reverse $ _stReports $ addReport env s)
   in unReporter p env (initialState off) ok err
@@ -406,7 +407,7 @@ addReport e s = s { _stReports = Report { _reportFile = _envFile e
                                         , _reportLine = _stErrLine s
                                         , _reportColumn = _stErrColumn s } : _stReports s }
 
-initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int -> Env k
+initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int# -> Env k
 initialEnv _envOptions _envFile _envBuf _envEnd = Env
   { _envFile
   , _envBuf
@@ -419,7 +420,7 @@ initialEnv _envOptions _envFile _envBuf _envEnd = Env
   , _envRefColumn = 1
   }
 
-initialState :: Int -> State
+initialState :: Int# -> State
 initialState _stOff = State
   { _stOff
   , _stLine      = 1
