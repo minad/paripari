@@ -13,7 +13,6 @@ module Text.PariPari.Lens (
   , optMaxLabelsPerContext
 ) where
 
-import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
 import Text.PariPari.Internal.Reporter
 

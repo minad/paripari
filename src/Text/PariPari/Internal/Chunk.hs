@@ -5,7 +5,6 @@
 {-# LANGUAGE UnboxedTuples #-}
 module Text.PariPari.Internal.Chunk (
   Chunk(..)
-  , Pos(..)
   , showByte
   , showByteString
   , unsafeAsciiToChar
@@ -23,7 +22,6 @@ import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Ptr (plusPtr)
 import Foreign.Storable (peekByteOff)
 import GHC.Base (unsafeChr)
-import GHC.Generics (Generic)
 import GHC.Show (showLitChar)
 import Numeric (showHex)
 import qualified Data.ByteString as B
@@ -31,12 +29,6 @@ import qualified Data.ByteString.Internal as B
 import qualified Data.Text.Array as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.Internal as T
-
--- | Line and column position starting at (1,1)
-data Pos = Pos
-  { _posLine   :: {-#UNPACK#-}!Int
-  , _posColumn :: {-#UNPACK#-}!Int
-  } deriving (Eq, Show, Generic)
 
 class Ord k => Chunk k where
   type Buffer k

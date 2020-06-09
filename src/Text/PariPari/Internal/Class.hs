@@ -31,6 +31,12 @@ data Error
   | ENotEnoughIndent  {-#UNPACK#-}!Int {-#UNPACK#-}!Int
   deriving (Eq, Ord, Show, Generic)
 
+-- | Line and column position starting at (1,1)
+data Pos = Pos
+  { _posLine   :: {-#UNPACK#-}!Int
+  , _posColumn :: {-#UNPACK#-}!Int
+  } deriving (Eq, Show, Generic)
+
 -- | Parser class, which specifies the necessary
 -- primitives for parsing. All other parser combinators
 -- rely on these primitives.

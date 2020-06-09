@@ -1,10 +1,10 @@
 module Text.PariPari (
   C.Parser(..)
+  , C.Pos(..)
   , C.Error(..)
   , C.showError
 
   , K.Chunk(showChunk)
-  , K.Pos(..)
 
   , U.runParser
   , U.runParserWithOptions
