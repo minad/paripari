@@ -11,7 +11,8 @@ PariPari offers two parsing strategies. There is a fast Acceptor and a slower Re
 If the Acceptor fails, the Reporter returns a report about the parsing errors.
 This allows for fast parsing in the good case without compromising on the quality of the error messages.
 
-Like Attoparsec, the parser combinators backtrack by default. To avoid bad error messages the `<!>` parser combinator is provided, which does not backtrack.
+Like Attoparsec, the parser combinators backtrack by default. To avoid exponential parsing time if errors are found and
+in order to avoid bad error messages, the `<!>` parser combinator is provided, which does not backtrack.
 
 PariPari operates on strict `ByteString` and `Text`.
 As a consequence, PariPari is only a good fit for data which is available at once (no streaming).
