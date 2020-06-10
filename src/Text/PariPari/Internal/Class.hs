@@ -19,6 +19,7 @@ import Data.String (IsString)
 import Data.Word (Word8)
 import GHC.Generics (Generic)
 import Text.PariPari.Internal.Chunk
+import qualified Control.Monad.Fail as Fail
 
 -- | Parsing errors
 data Error
@@ -42,7 +43,7 @@ infixl 3 <!>
 -- | Parser class, which specifies the necessary
 -- primitives for parsing. All other parser combinators
 -- rely on these primitives.
-class (MonadFail p, MonadPlus p, Chunk k, IsString (p k)) => Parser k p | p -> k where
+class (Fail.MonadFail p, MonadPlus p, Chunk k, IsString (p k)) => Parser k p | p -> k where
   -- | Get file name associated with current parser
   getFile :: p FilePath
 
