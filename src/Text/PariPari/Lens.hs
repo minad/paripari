@@ -1,9 +1,9 @@
 {-# LANGUAGE Rank2Types #-}
 module Text.PariPari.Lens (
   posLine
-  , posColumn
+  , posCol
   , reportLine
-  , reportColumn
+  , reportCol
   , reportFile
   , reportErrors
   , ecErrors
@@ -22,17 +22,17 @@ posLine :: Lens Pos Int
 posLine k p = fmap (\x -> p { _posLine = x }) (k (_posLine p))
 {-# INLINE posLine #-}
 
-posColumn :: Lens Pos Int
-posColumn k p = fmap (\x -> p { _posColumn = x }) (k (_posColumn p))
-{-# INLINE posColumn #-}
+posCol :: Lens Pos Int
+posCol k p = fmap (\x -> p { _posCol = x }) (k (_posCol p))
+{-# INLINE posCol #-}
 
 reportLine :: Lens Report Int
 reportLine k r = fmap (\x -> r { _reportLine = x }) (k (_reportLine r))
 {-# INLINE reportLine #-}
 
-reportColumn :: Lens Report Int
-reportColumn k r = fmap (\x -> r { _reportColumn = x }) (k (_reportColumn r))
-{-# INLINE reportColumn #-}
+reportCol :: Lens Report Int
+reportCol k r = fmap (\x -> r { _reportCol = x }) (k (_reportCol r))
+{-# INLINE reportCol #-}
 
 reportFile :: Lens Report FilePath
 reportFile k r = fmap (\x -> r { _reportFile = x }) (k (_reportFile r))

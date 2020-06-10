@@ -112,9 +112,11 @@ parserTests run =
 
     , testCase "eof" $ do
         ok eof "" ()
+        ok eof "\0" ()
+        ok eof "\0\0" ()
         ok (chunk "abc" *> eof) "abc" ()
+        ok (chunk "abc" *> eof) "abc\0" ()
         err eof "abc"
-        err eof "\0"
         err (chunk "ab" *> eof) "abc"
 
     , testCase "label" $ do
@@ -241,18 +243,18 @@ parserTests run =
         ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefLine) "a\nb" 2
         ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefLine)) "a\nb" 2
 
-    , testCase "getColumn" $ do
-        ok getColumn "" 1
-        ok (char 'a' *> getColumn) "abc" 2
-        ok (char 'a' *> char '\n' *> getColumn) "a\nb" 1
-        ok (char 'a' *> char '\n' *> char 'b' *> getColumn) "a\nb" 2
+    , testCase "getCol" $ do
+        ok getCol "" 1
+        ok (char 'a' *> getCol) "abc" 2
+        ok (char 'a' *> char '\n' *> getCol) "a\nb" 1
+        ok (char 'a' *> char '\n' *> char 'b' *> getCol) "a\nb" 2
 
-    , testCase "getRefColumn" $ do
-        ok getRefColumn "" 1
-        ok (char 'a' *> getRefColumn) "abc" 1
-        ok (char 'a' *> char '\n' *> withRefPos getRefColumn) "a\nb" 1
-        ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefColumn) "a\nb" 2
-        ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefColumn)) "a\nb" 1
+    , testCase "getRefCol" $ do
+        ok getRefCol "" 1
+        ok (char 'a' *> getRefCol) "abc" 1
+        ok (char 'a' *> char '\n' *> withRefPos getRefCol) "a\nb" 1
+        ok (char 'a' *> char '\n' *> char 'b' *> withRefPos getRefCol) "a\nb" 2
+        ok (char 'a' *> char '\n' *> withRefPos (char 'b' *> getRefCol)) "a\nb" 1
 
     , testCase "withPos" $ do
         ok (withPos $ char 'a') "abc" (Pos 1 1, 'a')
@@ -260,9 +262,9 @@ parserTests run =
         ok (char 'a' *> char '\n' *> withPos (char 'b')) "a\nb" (Pos 2 1, 'b')
 
     , testCase "withSpan" $ do
-        ok (withSpan $ chunk "ab") "abc" ((Pos 1 1, Pos 1 3), "ab")
-        ok (char 'a' *> withSpan (chunk "bcd")) "abcde" ((Pos 1 2, Pos 1 5), "bcd")
-        ok (char 'a' *> char '\n' *> withSpan (chunk "bcd")) "a\nbcde" ((Pos 2 1, Pos 2 4), "bcd")
+        ok (withSpan $ chunk "ab") "abc" (Pos 1 1, Pos 1 3, "ab")
+        ok (char 'a' *> withSpan (chunk "bcd")) "abcde" (Pos 1 2, Pos 1 5, "bcd")
+        ok (char 'a' *> char '\n' *> withSpan (chunk "bcd")) "a\nbcde" (Pos 2 1, Pos 2 4, "bcd")
     ]
 
   , testGroup "Char Combinators"

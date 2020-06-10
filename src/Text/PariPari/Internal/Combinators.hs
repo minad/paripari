@@ -37,12 +37,12 @@ module Text.PariPari.Internal.Combinators (
 
   -- * Position
   , getLine
-  , getColumn
+  , getCol
   , withPos
   , withSpan
 
   -- * Indentation
-  , getRefColumn
+  , getRefCol
   , getRefLine
   , withRefPos
   , align
@@ -116,9 +116,9 @@ getRefLine = _posLine <$> getRefPos
 {-# INLINE getRefLine #-}
 
 -- | Get column number of the reference position
-getRefColumn :: P k Int
-getRefColumn = _posColumn <$> getRefPos
-{-# INLINE getRefColumn #-}
+getRefCol :: P k Int
+getRefCol = _posCol <$> getRefPos
+{-# INLINE getRefCol #-}
 
 -- | Get current line number
 getLine :: P k Int
@@ -126,9 +126,9 @@ getLine = _posLine <$> getPos
 {-# INLINE getLine #-}
 
 -- | Get current column
-getColumn :: P k Int
-getColumn = _posColumn <$> getPos
-{-# INLINE getColumn #-}
+getCol :: P k Int
+getCol = _posCol <$> getPos
+{-# INLINE getCol #-}
 
 -- | Decorate the parser result with the current position
 withPos :: Parser k p => p a -> p (Pos, a)
@@ -138,15 +138,13 @@ withPos p = do
   pure (pos, ret)
 {-# INLINE withPos #-}
 
-type Span = (Pos, Pos)
-
 -- | Decorate the parser result with the position span
-withSpan :: Parser k p => p a -> p (Span, a)
+withSpan :: Parser k p => p a -> p (Pos, Pos, a)
 withSpan p = do
   begin <- getPos
   ret <- p
   end <- getPos
-  pure ((begin, end), ret)
+  pure (begin, end, ret)
 {-# INLINE withSpan #-}
 
 -- | Parser succeeds on the same line as the reference line
@@ -160,16 +158,16 @@ line = do
 -- | Parser succeeds on the same column as the reference column
 align :: P k ()
 align = do
-  c <- getColumn
-  rc <- getRefColumn
+  c <- getCol
+  rc <- getRefCol
   when (c /= rc) $ failWith $ EIndentNotAligned rc c
 {-# INLINE align #-}
 
 -- | Parser succeeds for columns greater than the current reference column
 indented :: P k ()
 indented = do
-  c <- getColumn
-  rc <- getRefColumn
+  c <- getCol
+  rc <- getRefCol
   when (c <= rc) $ failWith $ ENotEnoughIndent rc c
 {-# INLINE indented #-}
 

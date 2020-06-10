@@ -34,7 +34,7 @@ data Error
 -- | Line and column position starting at (1,1)
 data Pos = Pos
   { _posLine   :: {-#UNPACK#-}!Int
-  , _posColumn :: {-#UNPACK#-}!Int
+  , _posCol :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 infixl 3 <!>

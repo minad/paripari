@@ -56,7 +56,7 @@ data Report = Report
   { _reportFile   :: !FilePath
   , _reportErrors :: [ErrorContext]
   , _reportLine   :: {-#UNPACK#-}!Int
-  , _reportColumn :: {-#UNPACK#-}!Int
+  , _reportCol :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 data Env k = Env
@@ -65,18 +65,17 @@ data Env k = Env
   , _envOptions   :: !ReportOptions
   , _envHidden    :: !Bool
   , _envContext   :: [String]
-  , _envEnd       :: Int#
   , _envRefLine   :: {-#UNPACK#-}!Int
-  , _envRefColumn :: {-#UNPACK#-}!Int
+  , _envRefCol :: {-#UNPACK#-}!Int
   }
 
 data State = State
   { _stOff       :: Int#
   , _stLine      :: {-#UNPACK#-}!Int
-  , _stColumn    :: {-#UNPACK#-}!Int
+  , _stCol    :: {-#UNPACK#-}!Int
   , _stErrOff    :: {-#UNPACK#-}!Int
   , _stErrLine   :: {-#UNPACK#-}!Int
-  , _stErrColumn :: {-#UNPACK#-}!Int
+  , _stErrCol :: {-#UNPACK#-}!Int
   , _stErrors    :: [ErrorContext]
   , _stReports   :: [Report]
   }
@@ -156,16 +155,16 @@ instance Chunk k => Fail.MonadFail (Reporter k) where
   {-# INLINE fail #-}
 
 instance Chunk k => Parser k (Reporter k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
+  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefColumn env)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
   {-# INLINE getRefPos #-}
 
-  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefColumn = _stColumn st }) p
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
   {-# INLINE withRefPos #-}
 
   label l p = local (const $ addLabel l) p
@@ -201,7 +200,7 @@ instance Chunk k => Parser k (Reporter k) where
   {-# INLINE failWith #-}
 
   eof = Reporter $ \env st ok err ->
-    case _stOff st >=# _envEnd env of
+    case indexByte @k (_envBuf env) (_stOff st) `eqWord#` int2Word# 0# of
       1# -> ok () st
       _ -> raiseError env st err expectedEnd
   {-# INLINE eof #-}
@@ -213,12 +212,10 @@ instance Chunk k => Parser k (Reporter k) where
     in unReporter p env st ok err1
   {-# INLINE recover #-}
 
-  chunk k = Reporter $ \env st@State{_stOff,_stColumn} ok err ->
-    let n = chunkWidth @k k
-    in if | 1# <- n +# _stOff <=# _envEnd env,
-            chunkEqual @k (_envBuf env) _stOff k ->
-            ok k st { _stOff = _stOff +# n, _stColumn = _stColumn + I# n }
-          | otherwise -> raiseError env st err $ EExpected [showChunk @k k]
+  chunk k = Reporter $ \env st@State{_stOff,_stCol} ok err ->
+    case matchChunk @k (_envBuf env) _stOff k of
+      -1# -> raiseError env st err $ EExpected [showChunk @k k]
+      n -> ok k st { _stOff = _stOff +# n, _stCol = _stCol + I# n }
   {-# INLINE chunk #-}
 
   asChunk p = do
@@ -229,52 +226,43 @@ instance Chunk k => Parser k (Reporter k) where
     pure $ packChunk src begin' (end' -# begin')
   {-# INLINE asChunk #-}
 
-  scan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
-         1# <- c `neChar#` '\0'# ->
-           case f (C# c) of
-             Just r ->
-               ok r st
-               { _stOff = _stOff +# w
-               , _stLine = case c `eqChar#` '\n'# of 1# -> _stLine + 1; _ -> _stLine
-               , _stColumn = case c `eqChar#` '\n'# of 1# -> 1; _ -> _stColumn + 1
-               }
-             Nothing ->
-               raiseError env st err $ EUnexpected $ show (C# c)
-       | 1# <- _stOff >=# _envEnd env ->
-           raiseError env st err unexpectedEnd
-       | otherwise ->
-           raiseError env st err EInvalidUtf8
+  scan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    case indexChar @k (_envBuf env) _stOff of
+      (# '\0'#, _ #) -> raiseError env st err unexpectedEnd
+      (# c, w #) ->
+        case f (C# c) of
+          Just r ->
+            ok r st { _stOff = _stOff +# w
+                    , _stLine = case c `eqChar#` '\n'# of 1# -> _stLine + 1; _ -> _stLine
+                    , _stCol = case c `eqChar#` '\n'# of 1# -> 1; _ -> _stCol + 1
+                    }
+          Nothing -> raiseError env st err $ EUnexpected $ show (C# c)
   {-# INLINE scan #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimised decoder.
   char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
-  char c
-    | w <- charWidth @k c =
-        Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-        if C# (charAtFixed @k w (_envBuf env) _stOff) == c then
-          ok c st
-          { _stOff = _stOff +# w
-          , _stLine = if c == '\n' then _stLine + 1 else _stLine
-          , _stColumn = if c == '\n' then 1 else _stColumn + 1
-          }
-        else
-          raiseError env st err $ EExpected [show c]
+  char c@(C# c') =
+    Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        case matchChar @k (_envBuf env) _stOff c' of
+          -1# -> raiseError env st err $ EExpected [show c]
+          w -> ok c st
+            { _stOff = _stOff +# w
+            , _stLine = if c == '\n' then _stLine + 1 else _stLine
+            , _stCol = if c == '\n' then 1 else _stCol + 1
+            }
   {-# INLINE char #-}
 
-  asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-    let b = W8# (byteAt @k (_envBuf env) _stOff)
+  asciiScan f = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+    let b = W8# (indexByte @k (_envBuf env) _stOff)
     in if | b /= 0,
             b < 128,
             Just x <- f b ->
               ok x st
               { _stOff = _stOff +# 1#
               , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stColumn = if b == asc_newline then 1 else _stColumn + 1
+              , _stCol = if b == asc_newline then 1 else _stCol + 1
               }
-          | 1# <- _stOff >=# _envEnd env ->
-              raiseError env st err unexpectedEnd
           | otherwise ->
               raiseError env st err $ EUnexpected $ showByte b
   {-# INLINE asciiScan #-}
@@ -282,12 +270,12 @@ instance Chunk k => Parser k (Reporter k) where
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
-    | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stColumn} ok err ->
-        if W8# (byteAt @k (_envBuf env) _stOff) == b then
+    | otherwise = Reporter $ \env st@State{_stOff, _stLine, _stCol} ok err ->
+        if W8# (indexByte @k (_envBuf env) _stOff) == b then
           ok b st
           { _stOff = _stOff +# 1#
           , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-          , _stColumn = if b == asc_newline then 1 else _stColumn + 1
+          , _stCol = if b == asc_newline then 1 else _stCol + 1
           }
         else
           raiseError env st err $ EExpected [showByte b]
@@ -329,7 +317,7 @@ addError env st e
       st { _stErrors    = [e']
          , _stErrOff    = I# (_stOff st)
          , _stErrLine   = _stLine st
-         , _stErrColumn = _stColumn st
+         , _stErrCol = _stCol st
          }
   | otherwise = st
 {-# INLINE addError #-}
@@ -348,7 +336,7 @@ mergeErrorState env s s'
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
         , _stErrLine   = _stErrLine s'
-        , _stErrColumn = _stErrColumn s'
+        , _stErrCol = _stErrCol s'
         }
   | _stErrOff s' == _stErrOff s =
       s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
@@ -390,8 +378,8 @@ defaultReportOptions = ReportOptions
 -- | Run 'Reporter' with additional 'ReportOptions'.
 runReporterWithOptions :: Chunk k => ReportOptions -> Reporter k a -> FilePath -> k -> (Maybe a, [Report])
 runReporterWithOptions o p f k =
-  let !(# b, off, len #) = unpackChunk k
-      env = initialEnv o f b (off +# len)
+  let !(# b, off #) = unpackChunk k
+      env = initialEnv o f b
       ok x s = (Just x, reverse $ _stReports s)
       err s = (Nothing, reverse $ _stReports $ addReport env s)
   in unReporter p env (initialState off) ok err
@@ -407,28 +395,27 @@ addReport :: Env k -> State -> State
 addReport e s = s { _stReports = Report { _reportFile = _envFile e
                                         , _reportErrors = _stErrors s
                                         , _reportLine = _stErrLine s
-                                        , _reportColumn = _stErrColumn s } : _stReports s }
+                                        , _reportCol = _stErrCol s } : _stReports s }
 
-initialEnv :: ReportOptions -> FilePath -> Buffer k -> Int# -> Env k
-initialEnv _envOptions _envFile _envBuf _envEnd = Env
+initialEnv :: ReportOptions -> FilePath -> Buffer k -> Env k
+initialEnv _envOptions _envFile _envBuf = Env
   { _envFile
   , _envBuf
   , _envOptions
-  , _envEnd
   , _envContext   = []
   , _envHidden    = False
   , _envRefLine   = 1
-  , _envRefColumn = 1
+  , _envRefCol = 1
   }
 
 initialState :: Int# -> State
 initialState _stOff = State
   { _stOff
   , _stLine      = 1
-  , _stColumn    = 1
+  , _stCol    = 1
   , _stErrOff    = 0
   , _stErrLine   = 0
-  , _stErrColumn = 0
+  , _stErrCol = 0
   , _stErrors    = []
   , _stReports   = []
   }
@@ -438,7 +425,7 @@ showReport :: Report -> String
 showReport r =
   "Parser errors at " <> _reportFile r
   <> ", line " <> show (_reportLine r)
-  <> ", column " <> show (_reportColumn r)
+  <> ", column " <> show (_reportCol r)
   <> "\n\n" <> showErrors (_reportErrors r)
 
 -- | Pretty string representation of '[ErrorContext]'.

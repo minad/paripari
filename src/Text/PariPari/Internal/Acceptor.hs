@@ -21,46 +21,45 @@ module Text.PariPari.Internal.Acceptor (
 import Control.Monad (void)
 import Data.Semigroup as Sem
 import Data.String (IsString(..))
-import GHC.Base
+import GHC.Base hiding (State#)
 import GHC.Word
 import Text.PariPari.Internal.Chunk
 import Text.PariPari.Internal.Class
 import qualified Control.Monad.Fail as Fail
 
 data Env k = Env
-  { _envBuf       :: !(Buffer k)
-  , _envFile      :: !FilePath
-  , _envEnd       :: Int#
-  , _envRefLine   :: {-#UNPACK#-}!Int
-  , _envRefColumn :: {-#UNPACK#-}!Int
+  { _envBuf     :: !(Buffer k)
+  , _envFile    :: !FilePath
+  , _envRefLine :: {-#UNPACK#-}!Int
+  , _envRefCol  :: {-#UNPACK#-}!Int
   }
 
-type State = (# Int#, Int, Int #)
+type State# = (# Int#, Int, Int #)
 
-type Result# a = (# Int# | (# State, a #) #)
-pattern Ok# :: State -> a -> Result# a
+type Result# a = (# Int# | (# State#, a #) #)
+
+pattern Ok# :: State# -> a -> Result# a
 pattern Ok# s a = (# | (# s, a #) #)
-
 pattern Err# :: Int# -> Result# a
 pattern Err# o = (# o | #)
 {-# COMPLETE Ok#, Err# #-}
 
-_stLine :: State -> Int
+_stLine :: State# -> Int
 _stLine (# _, x, _ #) = x
 {-# INLINE _stLine #-}
 
-_stColumn :: State -> Int
-_stColumn (# _, _, x #) = x
-{-# INLINE _stColumn #-}
+_stCol :: State# -> Int
+_stCol (# _, _, x #) = x
+{-# INLINE _stCol #-}
 
-_stOff :: State -> Int#
+_stOff :: State# -> Int#
 _stOff (# x, _, _ #) = x
 {-# INLINE _stOff #-}
 
 -- | Parser which is optimised for fast parsing. Error reporting
 -- is minimal.
 newtype Acceptor k a = Acceptor
-  { unAcceptor :: Env k -> State -> Result# a }
+  { unAcceptor :: Env k -> State# -> Result# a }
 
 instance (Chunk k, Semigroup a) => Sem.Semigroup (Acceptor k a) where
   p1 <> p2 = (<>) <$> p1 <*> p2
@@ -130,16 +129,16 @@ instance Chunk k => Fail.MonadFail (Acceptor k) where
   {-# INLINE fail #-}
 
 instance Chunk k => Parser k (Acceptor k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stColumn st)
+  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefColumn env)
+  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
   {-# INLINE getRefPos #-}
 
-  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefColumn = _stColumn st }) p
+  withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
   {-# INLINE withRefPos #-}
 
   notFollowedBy p = Acceptor $ \env st ->
@@ -158,7 +157,7 @@ instance Chunk k => Parser k (Acceptor k) where
   {-# INLINE failWith #-}
 
   eof = Acceptor $ \env st ->
-    case _stOff st >=# _envEnd env of
+    case indexByte @k (_envBuf env) (_stOff st) `eqWord#` int2Word# 0# of
       1# -> Ok# st ()
       _ -> Err# (_stOff st)
   {-# INLINE eof #-}
@@ -185,12 +184,10 @@ instance Chunk k => Parser k (Acceptor k) where
              | otherwise -> Err# o
   {-# INLINE (<!>) #-}
 
-  chunk k = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-    let n = chunkWidth @k k
-    in if | 1# <- n +# _stOff <=# _envEnd env,
-            chunkEqual @k (_envBuf env) _stOff k ->
-            Ok# (# _stOff +# n, _stLine, _stColumn + I# n #) k
-          | otherwise -> Err# _stOff
+  chunk k = Acceptor $ \env (# stOff, stLine, stCol #) ->
+    case matchChunk @k (_envBuf env) stOff k of
+      -1# -> Err# stOff
+      n -> Ok# (# stOff +# n, stLine, stCol + I# n #) k
   {-# INLINE chunk #-}
 
   asChunk p = do
@@ -201,53 +198,50 @@ instance Chunk k => Parser k (Acceptor k) where
     pure $ packChunk src begin' (end' -# begin')
   {-# INLINE asChunk #-}
 
-  scan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-    if | (# c, w #) <- charAt @k (_envBuf env) _stOff,
-         1# <- c `neChar#` '\0'#,
-         Just r <- f (C# c) ->
-           Ok# (# _stOff +# w,
-                 case c `eqChar#` '\n'# of 1# -> _stLine + 1; _ -> _stLine,
-                 case c `eqChar#` '\n'# of 1# -> 1; _ -> _stColumn + 1 #) r
-       | otherwise ->
-           Err# _stOff
+  scan f = Acceptor $ \env (# stOff, stLine, stCol #) ->
+    case indexChar @k (_envBuf env) stOff of
+      (# c, w #)
+        | 1# <- c `neChar#` '\0'#, Just r <- f (C# c) ->
+          Ok# (# stOff +# w,
+                case c `eqChar#` '\n'# of 1# -> stLine + 1; _ -> stLine,
+                case c `eqChar#` '\n'# of 1# -> 1; _ -> stCol + 1 #) r
+      _ -> Err# stOff
   {-# INLINE scan #-}
 
   -- By inling this combinator, GHC should figure out the `charWidth`
   -- of the character resulting in an optimised decoder.
   char '\0' = error "Character '\\0' cannot be parsed because it is used as sentinel"
-  char c
-    | w <- charWidth @k c =
-        Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-        if C# (charAtFixed @k w (_envBuf env) _stOff) == c then
-          Ok# (# _stOff +# w,
-                if c == '\n' then _stLine + 1 else _stLine,
-                if c == '\n' then 1 else _stColumn + 1 #) c
-        else
-          Err# _stOff
+  char c@(C# c') =
+    Acceptor $ \env (# stOff, stLine, stCol #) ->
+    case matchChar @k (_envBuf env) stOff c' of
+      -1# -> Err# stOff
+      w -> Ok# (# stOff +# w,
+                if c == '\n' then stLine + 1 else stLine,
+                if c == '\n' then 1 else stCol + 1 #) c
   {-# INLINE char #-}
 
-  asciiScan f = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-    if | b <- W8# (byteAt @k (_envBuf env) _stOff),
+  asciiScan f = Acceptor $ \env (# stOff, stLine, stCol #) ->
+    if | b <- W8# (indexByte @k (_envBuf env) stOff),
          b /= 0,
          b < 128,
          Just x <- f b ->
-           Ok# (# _stOff +# 1#
-               , if b == asc_newline then _stLine + 1 else _stLine
-               , if b == asc_newline then 1 else _stColumn + 1 #) x
+           Ok# (# stOff +# 1#
+               , if b == asc_newline then stLine + 1 else stLine
+               , if b == asc_newline then 1 else stCol + 1 #) x
        | otherwise ->
-           Err# _stOff
+           Err# stOff
   {-# INLINE asciiScan #-}
 
   asciiByte 0 = error "Character '\\0' cannot be parsed because it is used as sentinel"
   asciiByte b
     | b >= 128 = error "Not an ASCII character"
-    | otherwise = Acceptor $ \env (# _stOff, _stLine, _stColumn #) ->
-        if W8# (byteAt @k (_envBuf env) _stOff) == b then
-          Ok# (# _stOff +# 1#
-              , if b == asc_newline then _stLine + 1 else _stLine
-              , if b == asc_newline then 1 else _stColumn + 1 #) b
+    | otherwise = Acceptor $ \env (# stOff, stLine, stCol #) ->
+        if W8# (indexByte @k (_envBuf env) stOff) == b then
+          Ok# (# stOff +# 1#
+              , if b == asc_newline then stLine + 1 else stLine
+              , if b == asc_newline then 1 else stCol + 1 #) b
         else
-          Err# _stOff
+          Err# stOff
   {-# INLINE asciiByte #-}
 
 instance Chunk k => IsString (Acceptor k k) where
@@ -255,12 +249,12 @@ instance Chunk k => IsString (Acceptor k k) where
   {-# INLINE fromString #-}
 
 -- | Reader monad, get something from the environment
-get :: (Env k -> State -> a) -> Acceptor k a
+get :: (Env k -> State# -> a) -> Acceptor k a
 get f = Acceptor $ \env st -> Ok# st (f env st)
 {-# INLINE get #-}
 
 -- | Reader monad, modify environment locally
-local :: (State -> Env k -> Env k) -> Acceptor k a -> Acceptor k a
+local :: (State# -> Env k -> Env k) -> Acceptor k a -> Acceptor k a
 local f p = Acceptor $ \env st ->
   unAcceptor p (f st env) st
 {-# INLINE local #-}
@@ -269,16 +263,15 @@ local f p = Acceptor $ \env st ->
 -- a simple 'Error' or, if successful, the result.
 runAcceptor :: Chunk k => Acceptor k a -> FilePath -> k -> Maybe a
 runAcceptor p f k =
-  let !(# b, off, len #) = unpackChunk k
-  in case unAcceptor p (initialEnv f b (off +# len)) (# off, 1, 1 #) of
+  let !(# b, off #) = unpackChunk k
+  in case unAcceptor p (initialEnv f b) (# off, 1, 1 #) of
        Err# _ -> Nothing
        Ok# _ x -> Just x
 
-initialEnv :: FilePath -> Buffer k -> Int# -> Env k
-initialEnv _envFile _envBuf _envEnd = Env
+initialEnv :: FilePath -> Buffer k -> Env k
+initialEnv _envFile _envBuf = Env
   { _envBuf
   , _envFile
-  , _envEnd
   , _envRefLine = 1
-  , _envRefColumn = 1
+  , _envRefCol = 1
   }
