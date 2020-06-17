@@ -30,11 +30,11 @@ import qualified Control.Monad.Fail as Fail
 data Env k = Env
   { _envBuf     :: !(Buffer k)
   , _envFile    :: !FilePath
-  , _envRefLine :: {-#UNPACK#-}!Int
-  , _envRefCol  :: {-#UNPACK#-}!Int
+  , _envRefLine :: Int#
+  , _envRefCol  :: Int#
   }
 
-type State# = (# Int#, Int, Int #)
+type State# = (# Int#, Int#, Int# #)
 
 type Result# a = (# Int# | (# State#, a #) #)
 
@@ -44,11 +44,11 @@ pattern Err# :: Int# -> Result# a
 pattern Err# o = (# o | #)
 {-# COMPLETE Ok#, Err# #-}
 
-_stLine :: State# -> Int
+_stLine :: State# -> Int#
 _stLine (# _, x, _ #) = x
 {-# INLINE _stLine #-}
 
-_stCol :: State# -> Int
+_stCol :: State# -> Int#
 _stCol (# _, _, x #) = x
 {-# INLINE _stCol #-}
 
@@ -129,13 +129,13 @@ instance Chunk k => Fail.MonadFail (Acceptor k) where
   {-# INLINE fail #-}
 
 instance Chunk k => Parser k (Acceptor k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
+  getPos = get $ \_ st -> Pos (I# (_stLine st)) (I# (_stCol st))
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
+  getRefPos = get $ \env _ -> Pos (I# (_envRefLine env)) (I# (_envRefCol env))
   {-# INLINE getRefPos #-}
 
   withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
@@ -187,7 +187,7 @@ instance Chunk k => Parser k (Acceptor k) where
   chunk k = Acceptor $ \env (# stOff, stLine, stCol #) ->
     case matchChunk @k (_envBuf env) stOff k of
       -1# -> Err# stOff
-      n -> Ok# (# stOff +# n, stLine, stCol + I# n #) k
+      n -> Ok# (# stOff +# n, stLine, stCol +# n #) k
   {-# INLINE chunk #-}
 
   asChunk p = do
@@ -203,8 +203,8 @@ instance Chunk k => Parser k (Acceptor k) where
       (# c, w #)
         | 1# <- c `neChar#` '\0'#, Just r <- f (C# c) ->
           Ok# (# stOff +# w,
-                case c `eqChar#` '\n'# of 1# -> stLine + 1; _ -> stLine,
-                case c `eqChar#` '\n'# of 1# -> 1; _ -> stCol + 1 #) r
+                case c `eqChar#` '\n'# of 1# -> stLine +# 1#; _ -> stLine,
+                case c `eqChar#` '\n'# of 1# -> 1#; _ -> stCol +# 1# #) r
       _ -> Err# stOff
   {-# INLINE scan #-}
 
@@ -216,8 +216,8 @@ instance Chunk k => Parser k (Acceptor k) where
     case matchChar @k (_envBuf env) stOff c' of
       -1# -> Err# stOff
       w -> Ok# (# stOff +# w,
-                if c == '\n' then stLine + 1 else stLine,
-                if c == '\n' then 1 else stCol + 1 #) c
+                if c == '\n' then stLine +# 1# else stLine,
+                if c == '\n' then 1# else stCol +# 1# #) c
   {-# INLINE char #-}
 
   asciiScan f = Acceptor $ \env (# stOff, stLine, stCol #) ->
@@ -226,8 +226,8 @@ instance Chunk k => Parser k (Acceptor k) where
          b < 128,
          Just x <- f b ->
            Ok# (# stOff +# 1#
-               , if b == asc_newline then stLine + 1 else stLine
-               , if b == asc_newline then 1 else stCol + 1 #) x
+               , if b == asc_newline then stLine +# 1# else stLine
+               , if b == asc_newline then 1# else stCol +# 1# #) x
        | otherwise ->
            Err# stOff
   {-# INLINE asciiScan #-}
@@ -238,8 +238,8 @@ instance Chunk k => Parser k (Acceptor k) where
     | otherwise = Acceptor $ \env (# stOff, stLine, stCol #) ->
         if W8# (indexByte @k (_envBuf env) stOff) == b then
           Ok# (# stOff +# 1#
-              , if b == asc_newline then stLine + 1 else stLine
-              , if b == asc_newline then 1 else stCol + 1 #) b
+              , if b == asc_newline then stLine +# 1# else stLine
+              , if b == asc_newline then 1# else stCol +# 1# #) b
         else
           Err# stOff
   {-# INLINE asciiByte #-}
@@ -264,7 +264,7 @@ local f p = Acceptor $ \env st ->
 runAcceptor :: Chunk k => Acceptor k a -> FilePath -> k -> Maybe a
 runAcceptor p f k =
   let !(# b, off #) = unpackChunk k
-  in case unAcceptor p (initialEnv f b) (# off, 1, 1 #) of
+  in case unAcceptor p (initialEnv f b) (# off, 1#, 1# #) of
        Err# _ -> Nothing
        Ok# _ x -> Just x
 
@@ -272,6 +272,6 @@ initialEnv :: FilePath -> Buffer k -> Env k
 initialEnv _envFile _envBuf = Env
   { _envBuf
   , _envFile
-  , _envRefLine = 1
-  , _envRefCol = 1
+  , _envRefLine = 1#
+  , _envRefCol = 1#
   }
