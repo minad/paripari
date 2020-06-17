@@ -42,8 +42,8 @@ import qualified Control.Monad.Fail as Fail
 import qualified Data.List.NonEmpty as NE
 
 data ErrorContext = ErrorContext
-  { _ecErrors  :: [Error]
-  , _ecContext :: [String]
+  { _ecErrors  :: ![Error]
+  , _ecContext :: ![String]
   } deriving (Eq, Show, Generic)
 
 data ReportOptions = ReportOptions
@@ -54,9 +54,9 @@ data ReportOptions = ReportOptions
 
 data Report = Report
   { _reportFile   :: !FilePath
-  , _reportErrors :: [ErrorContext]
+  , _reportErrors :: ![ErrorContext]
   , _reportLine   :: {-#UNPACK#-}!Int
-  , _reportCol :: {-#UNPACK#-}!Int
+  , _reportCol    :: {-#UNPACK#-}!Int
   } deriving (Eq, Show, Generic)
 
 data Env k = Env
@@ -64,20 +64,20 @@ data Env k = Env
   , _envFile      :: !FilePath
   , _envOptions   :: !ReportOptions
   , _envHidden    :: !Bool
-  , _envContext   :: [String]
-  , _envRefLine   :: {-#UNPACK#-}!Int
-  , _envRefCol :: {-#UNPACK#-}!Int
+  , _envContext   :: ![String]
+  , _envRefLine   :: Int#
+  , _envRefCol    :: Int#
   }
 
 data State = State
   { _stOff       :: Int#
-  , _stLine      :: {-#UNPACK#-}!Int
-  , _stCol    :: {-#UNPACK#-}!Int
-  , _stErrOff    :: {-#UNPACK#-}!Int
-  , _stErrLine   :: {-#UNPACK#-}!Int
-  , _stErrCol :: {-#UNPACK#-}!Int
-  , _stErrors    :: [ErrorContext]
-  , _stReports   :: [Report]
+  , _stLine      :: Int#
+  , _stCol       :: Int#
+  , _stErrOff    :: Int#
+  , _stErrLine   :: Int#
+  , _stErrCol    :: Int#
+  , _stErrors    :: ![ErrorContext]
+  , _stReports   :: ![Report]
   }
 
 -- | Parser which is optimised for good error reports.
@@ -155,13 +155,13 @@ instance Chunk k => Fail.MonadFail (Reporter k) where
   {-# INLINE fail #-}
 
 instance Chunk k => Parser k (Reporter k) where
-  getPos = get $ \_ st -> Pos (_stLine st) (_stCol st)
+  getPos = get $ \_ st -> Pos (I# (_stLine st)) (I# (_stCol st))
   {-# INLINE getPos #-}
 
   getFile = get $ \env _ -> _envFile env
   {-# INLINE getFile #-}
 
-  getRefPos = get $ \env _ -> Pos (_envRefLine env) (_envRefCol env)
+  getRefPos = get $ \env _ -> Pos (I# (_envRefLine env)) (I# (_envRefCol env))
   {-# INLINE getRefPos #-}
 
   withRefPos p = local (\st env -> env { _envRefLine = _stLine st, _envRefCol = _stCol st }) p
@@ -215,7 +215,7 @@ instance Chunk k => Parser k (Reporter k) where
   chunk k = Reporter $ \env st@State{_stOff,_stCol} ok err ->
     case matchChunk @k (_envBuf env) _stOff k of
       -1# -> raiseError env st err $ EExpected [showChunk @k k]
-      n -> ok k st { _stOff = _stOff +# n, _stCol = _stCol + I# n }
+      n -> ok k st { _stOff = _stOff +# n, _stCol = _stCol +# n }
   {-# INLINE chunk #-}
 
   asChunk p = do
@@ -233,8 +233,8 @@ instance Chunk k => Parser k (Reporter k) where
         case f (C# c) of
           Just r ->
             ok r st { _stOff = _stOff +# w
-                    , _stLine = case c `eqChar#` '\n'# of 1# -> _stLine + 1; _ -> _stLine
-                    , _stCol = case c `eqChar#` '\n'# of 1# -> 1; _ -> _stCol + 1
+                    , _stLine = case c `eqChar#` '\n'# of 1# -> _stLine +# 1#; _ -> _stLine
+                    , _stCol = case c `eqChar#` '\n'# of 1# -> 1#; _ -> _stCol +# 1#
                     }
           Nothing -> raiseError env st err $ EUnexpected $ show (C# c)
   {-# INLINE scan #-}
@@ -248,8 +248,8 @@ instance Chunk k => Parser k (Reporter k) where
           -1# -> raiseError env st err $ EExpected [show c]
           w -> ok c st
             { _stOff = _stOff +# w
-            , _stLine = if c == '\n' then _stLine + 1 else _stLine
-            , _stCol = if c == '\n' then 1 else _stCol + 1
+            , _stLine = if c == '\n' then _stLine +# 1# else _stLine
+            , _stCol = if c == '\n' then 1# else _stCol +# 1#
             }
   {-# INLINE char #-}
 
@@ -260,8 +260,8 @@ instance Chunk k => Parser k (Reporter k) where
             Just x <- f b ->
               ok x st
               { _stOff = _stOff +# 1#
-              , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-              , _stCol = if b == asc_newline then 1 else _stCol + 1
+              , _stLine = if b == asc_newline then _stLine +# 1# else _stLine
+              , _stCol = if b == asc_newline then 1# else _stCol +# 1#
               }
           | otherwise ->
               raiseError env st err $ EUnexpected $ showByte b
@@ -274,8 +274,8 @@ instance Chunk k => Parser k (Reporter k) where
         if W8# (indexByte @k (_envBuf env) _stOff) == b then
           ok b st
           { _stOff = _stOff +# 1#
-          , _stLine = if b == asc_newline then _stLine + 1 else _stLine
-          , _stCol = if b == asc_newline then 1 else _stCol + 1
+          , _stLine = if b == asc_newline then _stLine +# 1# else _stLine
+          , _stCol = if b == asc_newline then 1# else _stCol +# 1#
           }
         else
           raiseError env st err $ EExpected [showByte b]
@@ -312,10 +312,10 @@ addLabel l env = case _envContext env of
 -- Furthermore the error is merged with existing errors if possible.
 addError :: Env k -> State -> Error -> State
 addError env st e
-  | I# (_stOff st) > _stErrOff st,
+  | 1# <- _stOff st ># _stErrOff st,
     Just e' <- mkError env e =
       st { _stErrors    = [e']
-         , _stErrOff    = I# (_stOff st)
+         , _stErrOff    = _stOff st
          , _stErrLine   = _stLine st
          , _stErrCol = _stCol st
          }
@@ -332,22 +332,19 @@ mkError env e
 -- | Merge errors of two states, used when backtracking
 mergeErrorState :: Env k -> State -> State -> State
 mergeErrorState env s s'
-  | _stErrOff s' > _stErrOff s =
+  | 1# <- _stErrOff s' ># _stErrOff s =
       s { _stErrors    = _stErrors s'
         , _stErrOff    = _stErrOff s'
         , _stErrLine   = _stErrLine s'
-        , _stErrCol = _stErrCol s'
+        , _stErrCol    = _stErrCol s'
         }
-  | _stErrOff s' == _stErrOff s =
+  | 1# <- _stErrOff s' ==# _stErrOff s =
       s { _stErrors = shrinkErrors env $ _stErrors s' <> _stErrors s }
   | otherwise = s
 {-# INLINE mergeErrorState #-}
 
-groupOn :: Eq e => (a -> e) -> [a] -> [NonEmpty a]
-groupOn f = NE.groupBy ((==) `on` f)
-
 shrinkErrors :: Env k -> [ErrorContext] -> [ErrorContext]
-shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . groupOn _ecContext . sortOn _ecContext
+shrinkErrors env = take (_optMaxContexts._envOptions $ env) . map (mergeErrorContexts env) . NE.groupBy ((==) `on` _ecContext) . sortOn _ecContext
 
 -- | Shrink error context by deleting duplicates
 -- and merging errors if possible.
@@ -394,8 +391,8 @@ runReporter = runReporterWithOptions defaultReportOptions
 addReport :: Env k -> State -> State
 addReport e s = s { _stReports = Report { _reportFile = _envFile e
                                         , _reportErrors = _stErrors s
-                                        , _reportLine = _stErrLine s
-                                        , _reportCol = _stErrCol s } : _stReports s }
+                                        , _reportLine = I# (_stErrLine s)
+                                        , _reportCol = I# (_stErrCol s) } : _stReports s }
 
 initialEnv :: ReportOptions -> FilePath -> Buffer k -> Env k
 initialEnv _envOptions _envFile _envBuf = Env
@@ -404,18 +401,18 @@ initialEnv _envOptions _envFile _envBuf = Env
   , _envOptions
   , _envContext   = []
   , _envHidden    = False
-  , _envRefLine   = 1
-  , _envRefCol = 1
+  , _envRefLine   = 1#
+  , _envRefCol    = 1#
   }
 
 initialState :: Int# -> State
 initialState _stOff = State
   { _stOff
-  , _stLine      = 1
-  , _stCol    = 1
-  , _stErrOff    = 0
-  , _stErrLine   = 0
-  , _stErrCol = 0
+  , _stLine      = 1#
+  , _stCol       = 1#
+  , _stErrOff    = 0#
+  , _stErrLine   = 0#
+  , _stErrCol    = 0#
   , _stErrors    = []
   , _stReports   = []
   }
