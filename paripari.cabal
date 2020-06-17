@@ -1,6 +1,6 @@
 cabal-version: 1.12
 name:           paripari
-version:        0.6.0.1
+version:        0.7.0.0
 synopsis:       Parser combinators with fast-path and slower fallback for error reporting
 description:    PariPari offers two parsing strategies. There is a fast Acceptor and a slower Reporter. If the Acceptor fails, the Reporter returns a report about the parsing errors.
 category:       Text
